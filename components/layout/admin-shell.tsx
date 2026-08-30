@@ -2,10 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, Coins, Command, LayoutDashboard, Menu, ReceiptText, Server, Settings, ShieldCheck, Users, X, KeyRound } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { Activity, BarChart3, Coins, Command, KeyRound, LayoutDashboard, ReceiptText, Server, Settings, ShieldCheck, Users } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { AdminSession } from "@/lib/auth/access";
 
 const groups = [
@@ -16,18 +34,118 @@ const groups = [
   { label: "平台", items: [{ label: "审计日志", href: "/audit-logs", icon: ShieldCheck }, { label: "设置", href: "/settings", icon: Settings }] },
 ];
 
+function currentTitle(pathname: string) {
+  const active = groups
+    .map((group) => ({ group, item: group.items.find((item) => (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href))) }))
+    .find((match) => match.item);
+  return active ? `${active.group.label} / ${active.item!.label}` : "AxoAdmin";
+}
+
+function ShellSidebar() {
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+  return (
+    <>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/" onClick={closeOnMobile}>
+                <div className="flex aspect-square size-8 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Command className="size-4" />
+                </div>
+                <div className="flex min-w-0 flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-medium">AxoAdmin</span>
+                  <span className="truncate text-xs text-sidebar-foreground/70">Axolotl 管理中心</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        {groups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                        <Link href={item.href} onClick={closeOnMobile}>
+                          <Icon className="size-4 shrink-0" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </SidebarContent>
+    </>
+  );
+}
+
 export function AdminShell({ children, session }: { children: React.ReactNode; session: AdminSession | null }) {
-  const path = usePathname();
-  const [open, setOpen] = useState(false);
-  return <div className="min-h-svh bg-background">
-    <div className={cn("fixed inset-0 z-40 bg-black/30 md:hidden", !open && "hidden")} onClick={() => setOpen(false)} />
-    <aside className={cn("fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-background px-4 py-5 transition-transform md:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
-      <div className="flex items-center gap-3 px-2"><div className="grid size-9 place-items-center rounded-2xl bg-primary text-primary-foreground"><Command className="size-4" /></div><div><p className="text-sm font-semibold">AxoAdmin</p><p className="text-xs text-muted-foreground">Axolotl 管理中心</p></div><Button className="ml-auto md:hidden" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="关闭导航"><X className="size-4" /></Button></div>
-      <nav className="mt-8 flex-1 space-y-6">{groups.map((group) => <div key={group.label}><p className="mb-2 px-2 text-xs font-medium text-muted-foreground">{group.label}</p><div className="space-y-1">{group.items.map((item) => { const Icon = item.icon; const active = item.href === "/" ? path === "/" : path.startsWith(item.href); return <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={cn("flex h-10 items-center gap-3 rounded-2xl px-3 text-sm transition-colors", active ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-4" />{item.label}</Link>; })}</div></div>)}</nav>
-      <div className="rounded-2xl border bg-muted/40 p-3 text-xs text-muted-foreground"><div className="flex items-center gap-2 font-medium text-foreground"><ShieldCheck className="size-3.5 text-emerald-600" />Cloudflare Access</div><p className="mt-2 leading-5">GitHub axolotl-launcher 组织成员可访问。</p></div>
-    </aside>
-    <div className="md:pl-64"><header className="sticky top-0 z-30 flex h-16 items-center border-b bg-background/80 px-4 backdrop-blur-md sm:px-6"><Button className="mr-2 md:hidden" variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="打开导航"><Menu className="size-4" /></Button><div className="min-w-0"><p className="truncate text-sm font-medium">{path === "/" ? "工作台" : path.includes("cdks") ? "CDK 管理" : path.includes("users") ? "用户" : path.includes("orders") ? "赞助订单" : path.includes("telemetry") ? "遥测中心" : path.includes("api-keys") ? "API Key" : path.includes("usage") ? "API 用量" : "管理中心"}</p><p className="hidden text-xs text-muted-foreground sm:block">统一运营与管理控制台</p></div><div className="ml-auto flex items-center gap-2">
-      {session ? <><span className="hidden max-w-48 truncate text-xs text-muted-foreground sm:block">{session.identity.email ?? session.identity.name}</span><span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-700 dark:text-emerald-400 sm:flex"><span className="size-1.5 rounded-full bg-emerald-500" />已认证</span><Button asChild variant="ghost" size="sm"><a href={session.logoutUrl}>退出</a></Button></> : <><span className="text-xs text-destructive">未认证</span><Button asChild variant="outline" size="sm"><a href="/login">登录</a></Button></>}
-    </div></header><main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main></div>
-  </div>;
+  const pathname = usePathname();
+  if (pathname === "/login") return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={0}>
+      <SidebarProvider>
+        <Sidebar collapsible="icon" variant="inset">
+          <ShellSidebar />
+          <SidebarFooter>
+            <div className="flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-sidebar-accent/50 px-3 py-2.5 text-xs text-sidebar-foreground/70">
+              <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="leading-5 group-data-[collapsible=icon]:hidden">GitHub axolotl-launcher 组织成员可访问。</span>
+            </div>
+          </SidebarFooter>
+          <SidebarRail />
+        </Sidebar>
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-2 px-4 sm:px-6">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+            <div className="flex min-w-0 flex-col">
+              <p className="truncate text-sm font-medium">{currentTitle(pathname)}</p>
+              <p className="hidden truncate text-xs text-muted-foreground sm:block">统一运营与管理控制台</p>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {session ? (
+                <>
+                  <span className="hidden max-w-48 truncate text-xs text-muted-foreground md:block">{session.identity.email ?? session.identity.name}</span>
+                  <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 lg:flex dark:text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    已认证
+                  </span>
+                  <ThemeToggle />
+                  <Button asChild variant="outline" size="sm">
+                    <a href={session.logoutUrl}>退出</a>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-destructive">未认证</span>
+                  <ThemeToggle />
+                  <Button asChild variant="outline" size="sm">
+                    <a href="/">登录</a>
+                  </Button>
+                </>
+              )}
+            </div>
+          </header>
+          <main className="flex flex-1 flex-col gap-4 p-4 pt-6 sm:p-6 lg:p-8 lg:pt-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
+  );
 }

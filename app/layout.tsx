@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AdminShell } from "@/components/layout/admin-shell";
+import { ThemeProvider } from "@/components/theme-provider";
 import { getAdminSession } from "@/lib/auth/access";
 
-const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-inter" });
+const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-sans" });
 export const metadata: Metadata = { title: "AxoAdmin · Axolotl 管理中心", description: "Axolotl 统一管理中心" };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -15,5 +16,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   } catch {
     session = null;
   }
-  return <html lang="zh-CN" suppressHydrationWarning><body className={inter.variable}><AdminShell session={session}>{children}</AdminShell></body></html>;
+  return (
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={inter.variable}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AdminShell session={session}>{children}</AdminShell>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }
