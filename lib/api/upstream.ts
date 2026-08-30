@@ -15,7 +15,7 @@ async function passthrough(response: Response): Promise<Response> {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
-export async function probe(origin: string | undefined, path: string, init: RequestInit): Promise<ProbeResult> {
+async function probe(origin: string | undefined, path: string, init: RequestInit): Promise<ProbeResult> {
   if (!origin) return { kind: "unreachable" };
   try {
     const response = await fetch(new URL(path, origin), { ...init, signal: AbortSignal.timeout(15000) });
