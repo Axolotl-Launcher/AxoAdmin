@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAdminData } from "@/lib/api/use-admin-data";
 import { telemetryActivitySchema, telemetryDistributionsSchema, telemetryOverviewSchema } from "@/lib/api/schemas";
 
@@ -34,7 +36,7 @@ export default function Telemetry() {
   const cards = useMemo(() => metric ? [
     ["累计安装", metric.totalInstallations.value, "全部时间", Database, "green"], ["日活跃安装", metric.dau.value, "UTC 自然日", Activity, "blue"], ["错误发生次数", metric.errorOccurrences.value, `最近 ${range}`, AlertTriangle, "gold"], ["不同错误组", metric.distinctErrorGroups.value, `最近 ${range}`, Layers, "default"],
   ] as const : [], [metric, range]);
-  return <div><PageHeader title="遥测中心" description="查看主动同意遥测的匿名安装、活跃度与运行质量。" children={<div className="flex gap-2"><select value={range} onChange={(event) => setRange(event.target.value as (typeof ranges)[number])} className="h-10 rounded-xl border bg-background px-3 text-sm">{ranges.map((value) => <option key={value} value={value}>{value.replace("d", " 天")}</option>)}</select><button aria-label="刷新遥测" onClick={reload} className="grid size-10 place-items-center rounded-xl border"><RefreshCw className="size-4" /></button></div>} />
+  return <div><PageHeader title="遥测中心" description="查看主动同意遥测的匿名安装、活跃度与运行质量。" children={<div className="flex gap-2"><Select value={range} onValueChange={(value) => setRange(value as (typeof ranges)[number])}><SelectTrigger className="w-28" aria-label="时间范围"><SelectValue /></SelectTrigger><SelectContent>{ranges.map((value) => <SelectItem key={value} value={value}>{value.replace("d", " 天")}</SelectItem>)}</SelectContent></Select><Button aria-label="刷新遥测" variant="outline" size="icon" onClick={reload}><RefreshCw className="size-4" /></Button></div>} />
     {(overview.loading || activity.loading || distributions.loading) && <AdminLoading label="正在加载遥测数据…" />}
     {(overview.error || activity.error || distributions.error) && <AdminError message={overview.error || activity.error || distributions.error || "遥测数据加载失败。"} onRetry={reload} />}
     {overview.data && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value, detail, Icon, tone]) => <StatCard key={label} label={label} value={format(value)} detail={detail} icon={Icon} tone={tone} />)}</div>}

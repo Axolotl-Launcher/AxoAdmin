@@ -1,1 +1,10 @@
-import { NextResponse } from "next/server"; import { getAdminSession } from "@/lib/auth/access"; export async function GET(request:Request){try{return NextResponse.json(await getAdminSession(request.headers))}catch{return NextResponse.json({code:"UNAUTHENTICATED",message:"需要通过 Cloudflare Access 登录"},{status:401})}}
+import { NextResponse } from "next/server";
+import { authFailure, getAdminSession } from "@/lib/auth/access";
+
+export async function GET(request: Request) {
+  try {
+    return NextResponse.json(await getAdminSession(request.headers));
+  } catch (error) {
+    return authFailure(error);
+  }
+}

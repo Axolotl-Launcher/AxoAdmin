@@ -1,4 +1,4 @@
-import { getAdminSession } from "@/lib/auth/access";
+import { authFailure, getAdminSession } from "@/lib/auth/access";
 
 const allowed = new Set(["overview", "activity", "distributions", "errors", "system"]);
 const errorParams = new Set(["range", "page", "pageSize", "search", "version", "platform", "errorType", "hasSample", "sort", "direction"]);
@@ -9,7 +9,11 @@ function failure(message: string, status = 503) {
 }
 
 export async function telemetryRequest(path: string, request: Request) {
-  await getAdminSession(request.headers);
+  try {
+    await getAdminSession(request.headers);
+  } catch (error) {
+    return authFailure(error);
+  }
   const origin = process.env.TELEMETRY_ADMIN_ORIGIN;
   if (!origin) return failure("Telemetry service 尚未配置");
   const incoming = new URL(request.url);
