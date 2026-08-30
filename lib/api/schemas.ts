@@ -25,6 +25,10 @@ export const usageSchema = z.object({
 export const userDetailSchema = userSchema.extend({ recalculated_at: nullableDate, usage_summary: usageSchema });
 export const orderSchema = z.object({ user_id: z.string(), user_email: z.string().nullable(), actual_paid_fen: z.number(), status: z.string(), synced_at: z.string().datetime() });
 export const orderPageSchema = z.object({ items: z.array(orderSchema), page: z.number(), page_size: z.number(), total: z.number() });
+export const cdkSchema = z.object({ id: z.string(), batch_id: z.string(), amount_fen: z.number(), status: z.string(), redeemed_at: nullableDate });
+export const cdkListSchema = z.array(cdkSchema);
+export const adminApiKeySchema = z.object({ id: z.string(), user_id: z.string(), user_email: z.string().nullable(), status: z.string(), created_at: z.string().datetime(), last_used_at: nullableDate });
+export const adminApiKeyPageSchema = z.object({ items: z.array(adminApiKeySchema), page: z.number(), page_size: z.number(), total: z.number() });
 
 export type Overview = z.infer<typeof overviewSchema>;
 export type User = z.infer<typeof userSchema>;

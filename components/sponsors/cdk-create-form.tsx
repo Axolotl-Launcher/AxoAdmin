@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function CdkCreateForm() {
+export function CdkCreateForm({ onCreated }: { onCreated?: () => void }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("990");
   const [quantity, setQuantity] = useState("1");
@@ -28,6 +28,7 @@ export function CdkCreateForm() {
       const body = (await response.json()) as { cdks?: string[]; message?: string };
       if (!response.ok) throw new Error(body.message ?? "生成失败");
       setResult(body.cdks ?? []);
+      onCreated?.();
     } catch (error) {
       setResult([error instanceof Error ? error.message : "生成失败"]);
     } finally {
