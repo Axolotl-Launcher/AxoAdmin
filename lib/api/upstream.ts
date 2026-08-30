@@ -2,16 +2,32 @@ import { authFailure, getAdminSession } from "@/lib/auth/access";
 
 type ProbeResult = { kind: "ok"; response: Response } | { kind: "blocked" } | { kind: "unreachable" };
 
-async function probe(origin: string | undefined, path: string, init: RequestInit): Promise<ProbeResult> {
+// Node fetch transparently decompresses gzip/br bodies but leaves the
+// `content-encoding` header in place. Forwarding it verbatim makes browsers
+// fail with ERR_CONTENT_DECODING_FAILED. Drop it (and the stale compressed
+// content-length) and let the response body travel as-is.
+async function passthrough(response: Response): Promise<Response> {
+  const headers = new Headers();
+  for (const [key, value] of response.headers) {
+    if (key === "content-encoding" || key === "content-length") continue;
+    headers.set(key, value);
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+export async function probe(origin: string | undefined, path: string, init: RequestInit): Promise<ProbeResult> {
   if (!origin) return { kind: "unreachable" };
   try {
     const response = await fetch(new URL(path, origin), { ...init, signal: AbortSignal.timeout(15000) });
-    if (!response.ok && !(response.headers.get("content-type") ?? "").includes("application/json")) {
-      // Edge protection (e.g. Cloudflare managed challenge) answers with an
-      // HTML error page; treat it as blocked so the direct origin is tried.
+    if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
+      // The gateway only ever answers JSON. Non-JSON responses (Cloudflare
+      // managed challenge pages, Caddy error pages) are edge artifacts:
+      // treat them as blocked so the direct origin is tried. The challenge
+      // interstitial can come back with HTTP 200, so the content-type check
+      // must not depend on response.ok.
       return { kind: "blocked" };
     }
-    return { kind: "ok", response };
+    return { kind: "ok", response: await passthrough(response) };
   } catch {
     return { kind: "unreachable" };
   }
