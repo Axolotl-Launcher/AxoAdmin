@@ -146,9 +146,9 @@ export default function Errors() {
             <TableBody>
               {errors.data.items.map((item) => (
                 <TableRow key={item.fingerprint}>
-                  <TableCell className="max-w-[340px]">
-                    <Button variant="link" className="h-auto justify-start p-0 font-medium" onClick={() => setSelected(item.fingerprint)}>
-                      {item.latestMessage || "未提供错误信息"}
+                  <TableCell className="max-w-[340px] whitespace-normal">
+                    <Button variant="link" className="h-auto justify-start p-0 text-left font-medium whitespace-normal" onClick={() => setSelected(item.fingerprint)}>
+                      <span className="line-clamp-2 min-w-0 wrap-anywhere">{item.latestMessage || "未提供错误信息"}</span>
                     </Button>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{item.fingerprint}</p>
                   </TableCell>

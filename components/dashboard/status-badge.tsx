@@ -15,5 +15,9 @@ const tones: Record<Tone, string> = {
 };
 
 export function ToneBadge({ tone, className, children }: { tone: Tone; className?: string; children: ReactNode }) {
-  return <Badge className={cn(tones[tone], className)}>{children}</Badge>;
+  return (
+    <Badge variant={tone === "outline" ? "outline" : "default"} className={cn(tones[tone], className)}>
+      {children}
+    </Badge>
+  );
 }

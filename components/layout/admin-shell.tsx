@@ -6,7 +6,6 @@ import { Activity, BarChart3, Coins, Command, KeyRound, LayoutDashboard, Receipt
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -34,11 +33,21 @@ const groups = [
   { label: "平台", items: [{ label: "审计日志", href: "/audit-logs", icon: ShieldCheck }, { label: "设置", href: "/settings", icon: Settings }] },
 ];
 
+function isActive(href: string, pathname: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function matchItem(pathname: string) {
+  return groups
+    .flatMap((group) => group.items.map((item) => ({ group, item })))
+    .filter(({ item }) => isActive(item.href, pathname))
+    .sort((a, b) => b.item.href.length - a.item.href.length)[0];
+}
+
 function currentTitle(pathname: string) {
-  const active = groups
-    .map((group) => ({ group, item: group.items.find((item) => (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href))) }))
-    .find((match) => match.item);
-  return active ? `${active.group.label} / ${active.item!.label}` : "AxoAdmin";
+  const active = matchItem(pathname);
+  return active ? `${active.group.label} / ${active.item.label}` : "AxoAdmin";
 }
 
 function ShellSidebar() {
@@ -47,6 +56,7 @@ function ShellSidebar() {
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false);
   };
+  const activeItem = matchItem(pathname)?.item;
   return (
     <>
       <SidebarHeader>
@@ -74,7 +84,7 @@ function ShellSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const active = item === activeItem;
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
@@ -103,12 +113,6 @@ export function AdminShell({ children, session }: { children: React.ReactNode; s
       <SidebarProvider>
         <Sidebar collapsible="icon" variant="inset">
           <ShellSidebar />
-          <SidebarFooter>
-            <div className="flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-sidebar-accent/50 px-3 py-2.5 text-xs text-sidebar-foreground/70">
-              <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <span className="leading-5 group-data-[collapsible=icon]:hidden">GitHub axolotl-launcher 组织成员可访问。</span>
-            </div>
-          </SidebarFooter>
           <SidebarRail />
         </Sidebar>
         <SidebarInset>

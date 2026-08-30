@@ -48,7 +48,7 @@ function Trend({ points }: { points: { day: string; activeInstallations: number;
         ) : (
           <div className="flex h-52 items-end gap-1 overflow-hidden">
             {points.map((point) => (
-              <div key={point.day} className="group flex min-w-2 flex-1 items-end gap-px" title={`${point.day}: 活跃 ${point.activeInstallations}，新增 ${point.newInstallations}，错误 ${point.errorOccurrences}`}>
+              <div key={point.day} className="group flex h-full min-w-2 flex-1 items-end gap-px" title={`${point.day}: 活跃 ${point.activeInstallations}，新增 ${point.newInstallations}，错误 ${point.errorOccurrences}`}>
                 <div className="w-1/3 rounded-t-[2px] bg-sky-500" style={{ height: `${Math.max((point.activeInstallations / max) * 100, 2)}%` }} />
                 <div className="w-1/3 rounded-t-[2px] bg-emerald-500" style={{ height: `${Math.max((point.newInstallations / max) * 100, 2)}%` }} />
                 <div className="w-1/3 rounded-t-[2px] bg-amber-500" style={{ height: `${Math.max((point.errorOccurrences / max) * 100, 2)}%` }} />
