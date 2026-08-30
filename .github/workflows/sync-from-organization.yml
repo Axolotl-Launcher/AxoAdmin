@@ -1,0 +1,31 @@
+name: Sync from organization
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.repository == 'Mystic-Stars/AxoAdmin'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync organization main
+        run: |
+          git remote add upstream https://github.com/Axolotl-Launcher/AxoAdmin.git
+          git fetch upstream main
+          if git merge-base --is-ancestor HEAD upstream/main; then
+            git merge --ff-only upstream/main
+            git push origin main
+          elif git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Personal fork is ahead; no destructive sync performed"
+          else
+            echo "Branches diverged; manual reconciliation required"
+            exit 1
+          fi

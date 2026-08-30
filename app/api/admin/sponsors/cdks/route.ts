@@ -1,0 +1,1 @@
+import { sponsorRequest } from "@/lib/api/upstream"; export async function GET(request:Request){return sponsorRequest("/admin/cdks",request);} export async function POST(request:Request){return sponsorRequest("/admin/cdks",request,{method:"POST",body:await request.text()});}

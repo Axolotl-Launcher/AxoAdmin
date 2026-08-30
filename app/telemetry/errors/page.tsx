@@ -1,0 +1,37 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
+import { Card } from "@/components/ui/card";
+import { useAdminData } from "@/lib/api/use-admin-data";
+import { telemetryDetailSchema, telemetryErrorsSchema, telemetrySampleSchema } from "@/lib/api/schemas";
+
+const ranges = ["7d", "30d", "90d", "365d"] as const;
+const sorts = [["lastSeen", "最近发生"], ["firstSeen", "首次发生"], ["occurrences", "发生次数"], ["installations", "影响安装"]] as const;
+const date = (value: string) => new Date(value).toLocaleString("zh-CN", { timeZone: "UTC" });
+
+export default function Errors() {
+  const [range, setRange] = useState<(typeof ranges)[number]>("30d");
+  const [search, setSearch] = useState("");
+  const [querySearch, setQuerySearch] = useState("");
+  const [version, setVersion] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [errorType, setErrorType] = useState("");
+  const [hasSample, setHasSample] = useState("");
+  const [sort, setSort] = useState("lastSeen");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => { const timer = setTimeout(() => { setQuerySearch(search); setPage(1); }, 250); return () => clearTimeout(timer); }, [search]);
+  const query = useMemo(() => { const params = new URLSearchParams({ range, page: String(page), pageSize: "25", sort, direction: "desc" }); if (querySearch) params.set("search", querySearch); if (version) params.set("version", version); if (platform) params.set("platform", platform); if (errorType) params.set("errorType", errorType); if (hasSample) params.set("hasSample", hasSample); return `?${params}`; }, [errorType, hasSample, page, platform, querySearch, range, sort, version]);
+  const errors = useAdminData(`/api/admin/telemetry/errors${query}`, telemetryErrorsSchema);
+  const detail = useAdminData(selected ? `/api/admin/telemetry/errors/${encodeURIComponent(selected)}` : "/api/admin/telemetry/errors", telemetryDetailSchema, Boolean(selected));
+  const sample = useAdminData(selected ? `/api/admin/telemetry/errors/${encodeURIComponent(selected)}/sample` : "/api/admin/telemetry/errors", telemetrySampleSchema, Boolean(selected));
+  return <div><PageHeader title="错误分析" description="聚合查看遥测错误组、发生趋势和错误样本。" children={<div className="flex gap-2"><select value={range} onChange={(event) => { setRange(event.target.value as (typeof ranges)[number]); setPage(1); }} className="h-10 rounded-xl border bg-background px-3 text-sm">{ranges.map((value) => <option key={value}>{value.replace("d", " 天")}</option>)}</select><select value={sort} onChange={(event) => setSort(event.target.value)} className="h-10 rounded-xl border bg-background px-3 text-sm">{sorts.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>} />
+    <Card className="mb-4"><div className="grid gap-3 md:grid-cols-5"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索错误信息" className="h-10 rounded-xl border bg-background px-3 text-sm md:col-span-2" /><select value={version} onChange={(event) => { setVersion(event.target.value); setPage(1); }} className="h-10 rounded-xl border bg-background px-3 text-sm"><option value="">全部版本</option>{errors.data?.filters.versions.map((value) => <option key={value}>{value}</option>)}</select><select value={platform} onChange={(event) => { setPlatform(event.target.value); setPage(1); }} className="h-10 rounded-xl border bg-background px-3 text-sm"><option value="">全部平台</option>{errors.data?.filters.platforms.map((value) => <option key={value}>{value}</option>)}</select><select value={hasSample} onChange={(event) => { setHasSample(event.target.value); setPage(1); }} className="h-10 rounded-xl border bg-background px-3 text-sm"><option value="">样本不限</option><option value="true">有样本</option><option value="false">无样本</option></select></div></Card>
+    {errors.loading && <AdminLoading label="正在加载错误数据…" />}{errors.error && <AdminError message={errors.error} onRetry={errors.reload} />}{errors.data?.items.length === 0 && <AdminEmpty label="当前条件没有错误数据。" />}
+    {errors.data && errors.data.items.length > 0 && <Card className="overflow-x-auto p-0"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{["错误", "类型", "版本", "发生次数", "影响安装", "最近发生", "样本"].map((label) => <th key={label} className="p-4 font-medium">{label}</th>)}</tr></thead><tbody>{errors.data.items.map((item) => <tr key={item.fingerprint} className="border-b last:border-0"><td className="max-w-[360px] p-4"><button className="text-left font-medium hover:underline" onClick={() => setSelected(item.fingerprint)}>{item.latestMessage || "未提供错误信息"}</button><p className="mt-1 font-mono text-xs text-muted-foreground">{item.fingerprint}</p></td><td className="p-4">{item.errorType}</td><td className="p-4">{item.appVersion}</td><td className="p-4">{item.occurrenceCount}</td><td className="p-4">{item.affectedInstallations}</td><td className="p-4 text-xs text-muted-foreground">{date(item.lastSeen)}</td><td className="p-4">{item.hasSample ? "有" : "无"}</td></tr>)}</tbody></table></Card>}
+    {errors.data && errors.data.totalPages > 1 && <div className="mt-4 flex items-center justify-between text-sm"><span className="text-muted-foreground">第 {errors.data.page} / {errors.data.totalPages} 页，共 {errors.data.total} 组</span><div className="flex gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40">上一页</button><button disabled={page >= errors.data.totalPages} onClick={() => setPage((value) => value + 1)} className="rounded-xl border px-3 py-2 disabled:opacity-40">下一页</button></div></div>}
+    {selected && <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setSelected(null)}><div className="h-full w-full max-w-xl overflow-y-auto bg-background p-6 shadow-xl" onClick={(event) => event.stopPropagation()}><div className="mb-6 flex items-center justify-between"><h2 className="text-xl font-semibold">错误详情</h2><button onClick={() => setSelected(null)} className="rounded-xl border px-3 py-2 text-sm">关闭</button></div>{detail.loading && <AdminLoading label="正在加载详情…" />}{detail.error && <AdminError message={detail.error} onRetry={detail.reload} />}{detail.data && <div className="space-y-3 text-sm"><p><b>类型：</b>{detail.data.errorType}</p><p><b>版本：</b>{detail.data.appVersion}</p><p><b>首次：</b>{date(detail.data.firstSeen)}</p><p><b>最近：</b>{date(detail.data.lastSeen)}</p><p><b>消息：</b>{detail.data.latestMessage}</p><pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-3 text-xs">{detail.data.stack || "没有堆栈信息"}</pre>{detail.data.route && <p><b>路由：</b>{detail.data.route}</p>}{detail.data.command && <p><b>命令：</b>{detail.data.command}</p>}</div>}{sample.loading && <AdminLoading label="正在加载样本…" />}{sample.data && <div className="mt-6 border-t pt-6 text-sm"><h3 className="mb-3 font-semibold">最近样本</h3><p className="text-muted-foreground">{date(sample.data.occurredAt)} · {sample.data.platform} · {sample.data.architecture}</p><p className="mt-3">{sample.data.message}</p><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-3 text-xs">{sample.data.context || sample.data.stack || "没有上下文"}</pre></div>}</div></div>}
+  </div>;
+}

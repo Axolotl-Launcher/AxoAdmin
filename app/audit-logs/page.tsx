@@ -1,0 +1,1 @@
+import { PageHeader } from "@/components/dashboard/page-header"; import { Card } from "@/components/ui/card"; export default function Audit(){return <div><PageHeader title="审计日志" description="追踪管理中心中的关键查看、生成、撤销和配置操作。"/><Card className="border-dashed text-center text-sm text-muted-foreground">暂无审计日志。</Card></div>}
