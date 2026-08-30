@@ -9,8 +9,9 @@ export class AdminAuthError extends Error {
 }
 
 export async function getAdminSession(headers: Headers): Promise<AdminSession> {
+  const logoutUrl = process.env.CF_ACCESS_TEAM_DOMAIN ? `https://${process.env.CF_ACCESS_TEAM_DOMAIN}.cloudflareaccess.com/cdn-cgi/access/logout` : "/login";
   if (process.env.NODE_ENV === "development" && process.env.AXOADMIN_MOCK_AUTH === "true") {
-    return { identity: { name: "本地开发身份", email: "dev@example.com" }, organization: "axolotl-launcher", logoutUrl: "/cdn-cgi/access/logout" };
+    return { identity: { name: "本地开发身份", email: "dev@example.com" }, organization: "axolotl-launcher", logoutUrl };
   }
 
   const token = headers.get("cf-access-jwt-assertion");
@@ -24,7 +25,7 @@ export async function getAdminSession(headers: Headers): Promise<AdminSession> {
     const { payload } = await jwtVerify(token, createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`)), { issuer, audience, algorithms: ["RS256"] });
     const email = typeof payload.email === "string" ? payload.email : null;
     const name = typeof payload.name === "string" ? payload.name : (email ?? "GitHub member");
-    return { identity: { name, email }, organization: "axolotl-launcher", logoutUrl: "/cdn-cgi/access/logout" };
+    return { identity: { name, email }, organization: "axolotl-launcher", logoutUrl };
   } catch {
     throw new AdminAuthError("UNAUTHENTICATED", "Cloudflare Access 凭证无效或已过期", 401);
   }

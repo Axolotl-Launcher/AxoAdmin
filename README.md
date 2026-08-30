@@ -17,7 +17,7 @@ Axolotl 统一管理中心，独立于旧遥测 Dashboard，使用 Next.js、Rea
 
 Cloudflare Access 应用必须覆盖 `admin.axlmc.org/*`，包括 `/api/*`，并使用 GitHub `axolotl-launcher` 组织策略。Access 到 Vercel 的请求必须保留 `CF-Access-Jwt-Assertion`；应用会在服务端校验 issuer、audience 和 RS256 签名。仓库不包含 Vercel、Cloudflare 或 Verso 的远端配置，平台配置需要在对应控制台完成。
 
-未认证请求返回 401，缺少生产配置或上游不可达返回 503；这些状态不会再伪装成“已认证”。
+未认证请求返回 401，缺少生产配置或上游不可达返回 503；这些状态不会再伪装成“已认证”。应用内 `/login` 仅作为登录说明页，点击继续后回到受保护入口，由 Cloudflare Access 完成实际登录；退出使用 Cloudflare Team 域名的 logout endpoint。
 
 ## 模块
 
