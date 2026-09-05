@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, AlertTriangle, Database, Layers, RefreshCw } from "lucide-react";
+import { Activity, CalendarDays, Database, PackagePlus, RefreshCw, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -22,7 +22,7 @@ function Distribution({ title, items }: { title: string; items: { label: string;
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
       <CardContent className="grid gap-3">
         {items.slice(0, 8).map((item) => (
-          <div key={item.label} className="grid gap-1.5">
+          <div key={item.label} className="grid gap-1.5" title={`${item.label}: ${format(item.value)}`}>
             <div className="flex justify-between gap-4 text-xs">
               <span className="truncate">{item.label}</span>
               <span className="shrink-0 text-muted-foreground tabular-nums">{format(item.value)}</span>
@@ -37,29 +37,103 @@ function Distribution({ title, items }: { title: string; items: { label: string;
   );
 }
 
-function Trend({ points }: { points: { day: string; activeInstallations: number; newInstallations: number; errorOccurrences: number }[] }) {
-  const max = Math.max(...points.flatMap((point) => [point.activeInstallations, point.newInstallations, point.errorOccurrences]), 1);
+type TrendPoint = { day: string; activeInstallations: number; newInstallations: number };
+
+const chart = { width: 720, height: 280, top: 16, right: 18, bottom: 42, left: 54 } as const;
+
+function chartStep(maximum: number) {
+  const roughStep = Math.max(1, maximum / 4);
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const niceStep = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return niceStep * magnitude;
+}
+
+function shortDay(day: string) {
+  const [, month, date] = day.split("-");
+  return month && date ? `${Number(month)}/${Number(date)}` : day;
+}
+
+function Trend({ points }: { points: TrendPoint[] }) {
+  const data = useMemo(() => {
+    const maximum = Math.max(...points.flatMap((point) => [point.activeInstallations, point.newInstallations]), 0);
+    const step = chartStep(maximum);
+    const maximumY = Math.max(step, Math.ceil(maximum / step) * step);
+    const tickCount = Math.round(maximumY / step);
+    const plotWidth = chart.width - chart.left - chart.right;
+    const plotHeight = chart.height - chart.top - chart.bottom;
+    const x = (index: number) => chart.left + (points.length < 2 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+    const y = (value: number) => chart.top + plotHeight - (value / maximumY) * plotHeight;
+    const coordinates = points.map((point, index) => ({ point, x: x(index), activeY: y(point.activeInstallations), newY: y(point.newInstallations) }));
+    const line = (key: "activeY" | "newY") => coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point[key].toFixed(1)}`).join(" ");
+    const desiredXTickCount = Math.min(5, points.length);
+    const xTickIndices = desiredXTickCount < 2
+      ? points.length === 1 ? [0] : []
+      : [...new Set(Array.from({ length: desiredXTickCount }, (_, index) => Math.round((index * (points.length - 1)) / (desiredXTickCount - 1))))];
+    return {
+      activeLine: line("activeY"),
+      coordinates,
+      newLine: line("newY"),
+      plotHeight,
+      plotWidth,
+      xTickIndices,
+      yTicks: Array.from({ length: tickCount + 1 }, (_, index) => index * step),
+      y,
+    };
+  }, [points]);
+
   return (
     <Card>
-      <CardHeader><CardTitle>每日趋势</CardTitle></CardHeader>
+      <CardHeader><CardTitle>每日使用者趋势</CardTitle></CardHeader>
       <CardContent>
         {points.length === 0 ? (
           <AdminEmpty label="当前范围没有趋势数据。" />
         ) : (
-          <div className="flex h-52 items-end gap-1 overflow-hidden">
-            {points.map((point) => (
-              <div key={point.day} className="group flex h-full min-w-2 flex-1 items-end gap-px" title={`${point.day}: 活跃 ${point.activeInstallations}，新增 ${point.newInstallations}，错误 ${point.errorOccurrences}`}>
-                <div className="w-1/3 rounded-t-[2px] bg-sky-500" style={{ height: `${Math.max((point.activeInstallations / max) * 100, 2)}%` }} />
-                <div className="w-1/3 rounded-t-[2px] bg-emerald-500" style={{ height: `${Math.max((point.newInstallations / max) * 100, 2)}%` }} />
-                <div className="w-1/3 rounded-t-[2px] bg-amber-500" style={{ height: `${Math.max((point.errorOccurrences / max) * 100, 2)}%` }} />
-              </div>
-            ))}
-          </div>
+          <>
+            <p className="mb-3 text-xs text-muted-foreground">按 UTC 自然日统计；将鼠标悬停在数据点上可查看当天数值。</p>
+            <div className="overflow-x-auto pb-2">
+              <svg className="h-auto min-w-[620px] w-full" viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="每日活跃安装与新增安装趋势图">
+                <title>每日活跃安装与新增安装趋势</title>
+                <desc>蓝线表示活跃安装，绿线表示新增安装。</desc>
+                {data.yTicks.map((value) => {
+                  const tickY = data.y(value);
+                  return (
+                    <g key={value}>
+                      <line x1={chart.left} x2={chart.left + data.plotWidth} y1={tickY} y2={tickY} className="stroke-border" strokeWidth="1" />
+                      <text x={chart.left - 8} y={tickY} textAnchor="end" dominantBaseline="middle" className="fill-muted-foreground text-[10px]">{format(value)}</text>
+                    </g>
+                  );
+                })}
+                <line x1={chart.left} x2={chart.left} y1={chart.top} y2={chart.top + data.plotHeight} className="stroke-muted-foreground/50" strokeWidth="1" />
+                <line x1={chart.left} x2={chart.left + data.plotWidth} y1={chart.top + data.plotHeight} y2={chart.top + data.plotHeight} className="stroke-muted-foreground/50" strokeWidth="1" />
+                {data.xTickIndices.map((index) => {
+                  const point = data.coordinates[index];
+                  return (
+                    <g key={point.point.day}>
+                      <line x1={point.x} x2={point.x} y1={chart.top + data.plotHeight} y2={chart.top + data.plotHeight + 5} className="stroke-muted-foreground/50" strokeWidth="1" />
+                      <text x={point.x} y={chart.height - 16} textAnchor="middle" className="fill-muted-foreground text-[10px]">{shortDay(point.point.day)}</text>
+                    </g>
+                  );
+                })}
+                <path d={data.activeLine} fill="none" className="stroke-sky-500" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                <path d={data.newLine} fill="none" className="stroke-emerald-500" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                {data.coordinates.map(({ point, x, activeY, newY }) => (
+                  <g key={point.day}>
+                    <title>{`${point.day}（UTC）：活跃安装 ${format(point.activeInstallations)}，新增安装 ${format(point.newInstallations)}`}</title>
+                    <circle cx={x} cy={activeY} r="8" fill="transparent" />
+                    <circle cx={x} cy={newY} r="8" fill="transparent" />
+                    <circle cx={x} cy={activeY} r="3" className="fill-sky-500 stroke-background" strokeWidth="2" />
+                    <circle cx={x} cy={newY} r="3" className="fill-emerald-500 stroke-background" strokeWidth="2" />
+                  </g>
+                ))}
+              </svg>
+            </div>
+          </>
         )}
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-          {[["活跃安装", "bg-sky-500"], ["新增安装", "bg-emerald-500"], ["错误次数", "bg-amber-500"]].map(([label, color]) => (
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="图表图例">
+          {[["活跃安装", "bg-sky-500"], ["新增安装", "bg-emerald-500"]].map(([label, color]) => (
             <span key={label} className="flex items-center gap-1.5">
-              <span className={`size-2 rounded-full ${color}`} />
+              <span className={`h-0.5 w-4 rounded-full ${color}`} />
               {label}
             </span>
           ))}
@@ -78,14 +152,15 @@ export default function Telemetry() {
   const reload = () => { overview.reload(); activity.reload(); distributions.reload(); };
   const metric = overview.data?.metrics;
   const cards = useMemo(() => metric ? [
-    ["累计安装", metric.totalInstallations.value, "全部时间", Database, "green"],
-    ["日活跃安装", metric.dau.value, "UTC 自然日", Activity, "blue"],
-    ["错误发生次数", metric.errorOccurrences.value, `最近 ${range}`, AlertTriangle, "gold"],
-    ["不同错误组", metric.distinctErrorGroups.value, `最近 ${range}`, Layers, "default"],
-  ] as const : [], [metric, range]);
+    ["累计安装", metric.totalInstallations.value, metric.totalInstallations.label, Database, "green"],
+    ["日活跃安装", metric.dau.value, metric.dau.label, Activity, "blue"],
+    ["周活跃安装", metric.wau.value, metric.wau.label, CalendarDays, "blue"],
+    ["月活跃安装", metric.mau.value, metric.mau.label, Users, "blue"],
+    ["今日新增安装", metric.newInstallationsToday.value, metric.newInstallationsToday.label, PackagePlus, "green"],
+  ] as const : [], [metric]);
   return (
     <div className="grid gap-4">
-      <PageHeader title="遥测中心" description="查看主动同意遥测的匿名安装、活跃度与运行质量。">
+      <PageHeader title="遥测中心" description="查看主动同意遥测的匿名安装、活跃度与运行环境分布。">
         <Select value={range} onValueChange={(value) => setRange(value as (typeof ranges)[number])}>
           <SelectTrigger className="w-28" aria-label="时间范围">
             <SelectValue />
@@ -102,9 +177,9 @@ export default function Telemetry() {
       {(overview.error || activity.error || distributions.error) && (
         <AdminError message={overview.error || activity.error || distributions.error || "遥测数据加载失败。"} onRetry={reload} />
       )}
-      {overview.data && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([label, value, detail, Icon, tone]) => <StatCard key={label} label={label} value={format(value)} detail={detail} icon={Icon} tone={tone} />)}</div>}
+      {overview.data && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{cards.map(([label, value, detail, Icon, tone]) => <StatCard key={label} label={label} value={format(value)} detail={detail} icon={Icon} tone={tone} />)}</div>}
       {activity.data && <Trend points={activity.data.points} />}
-      {distributions.data && <div className="grid gap-4 lg:grid-cols-3"><Distribution title="版本分布" items={distributions.data.versions} /><Distribution title="平台分布" items={distributions.data.platforms} /><Distribution title="架构分布" items={distributions.data.architectures} /></div>}
+      {distributions.data && <div className="grid gap-4 lg:grid-cols-3"><Distribution title="版本使用情况" items={distributions.data.versions} /><Distribution title="平台分布" items={distributions.data.platforms} /><Distribution title="架构分布" items={distributions.data.architectures} /></div>}
       {!overview.loading && !overview.error && !overview.data && <AdminEmpty label="暂无遥测数据。" />}
     </div>
   );
