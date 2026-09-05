@@ -5,7 +5,7 @@ export class AnnouncementError extends Error {
   constructor(message: string, public status = 503) { super(message); }
 }
 export async function db(path: string, init: RequestInit = {}) {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new AnnouncementError("公告数据库尚未配置");
   const headers = new Headers(init.headers);
