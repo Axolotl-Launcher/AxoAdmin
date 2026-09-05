@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Coins, Command, KeyRound, LayoutDashboard, ReceiptText, Server, Settings, ShieldCheck, Users } from "lucide-react";
+import { Activity, Bell, Coins, Command, KeyRound, LayoutDashboard, ReceiptText, Server, Settings, ShieldCheck, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -29,6 +29,7 @@ const groups = [
   { label: "工作台", items: [{ label: "总览", href: "/", icon: LayoutDashboard }] },
   { label: "遥测中心", items: [{ label: "数据总览", href: "/telemetry", icon: Activity }, { label: "系统状态", href: "/telemetry/system", icon: Server }] },
   { label: "赞助与权益", items: [{ label: "用户", href: "/sponsors/users", icon: Users }, { label: "赞助订单", href: "/sponsors/orders", icon: ReceiptText }, { label: "CDK 管理", href: "/sponsors/cdks", icon: Coins }] },
+  { label: "公告", items: [{ label: "公告管理", href: "/announcements", icon: Bell }] },
   { label: "运营", items: [{ label: "API Key", href: "/operations/api-keys", icon: KeyRound }, { label: "API 用量", href: "/operations/usage", icon: Activity }] },
   { label: "平台", items: [{ label: "审计日志", href: "/audit-logs", icon: ShieldCheck }, { label: "设置", href: "/settings", icon: Settings }] },
 ];
@@ -153,3 +154,4 @@ export function AdminShell({ children, session }: { children: React.ReactNode; s
     </TooltipProvider>
   );
 }
+
