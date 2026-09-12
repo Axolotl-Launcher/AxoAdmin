@@ -1,19 +1,7 @@
 import { authFailure, getAdminSession } from "@/lib/auth/access";
+import { passthrough } from "@/lib/api/edge-proxy";
 
 type ProbeResult = { kind: "ok"; response: Response } | { kind: "blocked" } | { kind: "unreachable" };
-
-// Node fetch transparently decompresses gzip/br bodies but leaves the
-// `content-encoding` header in place. Forwarding it verbatim makes browsers
-// fail with ERR_CONTENT_DECODING_FAILED. Drop it (and the stale compressed
-// content-length) and let the response body travel as-is.
-async function passthrough(response: Response): Promise<Response> {
-  const headers = new Headers();
-  for (const [key, value] of response.headers) {
-    if (key === "content-encoding" || key === "content-length") continue;
-    headers.set(key, value);
-  }
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-}
 
 async function probe(origin: string | undefined, path: string, init: RequestInit): Promise<ProbeResult> {
   if (!origin) return { kind: "unreachable" };
@@ -27,7 +15,7 @@ async function probe(origin: string | undefined, path: string, init: RequestInit
       // must not depend on response.ok.
       return { kind: "blocked" };
     }
-    return { kind: "ok", response: await passthrough(response) };
+    return { kind: "ok", response: passthrough(response) };
   } catch {
     return { kind: "unreachable" };
   }

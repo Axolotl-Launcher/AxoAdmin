@@ -4,6 +4,7 @@ import { Activity, CalendarDays, Database, PackagePlus, RefreshCw, Users } from 
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { Distribution } from "@/components/dashboard/distribution";
 import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,39 +17,7 @@ const ranges = ["7d", "30d", "90d", "365d"] as const;
 const number = new Intl.NumberFormat("zh-CN");
 const format = (value: number) => number.format(value);
 
-function Distribution({ title, items }: { title: string; items: { label: string; value: number }[] }) {
-  const max = Math.max(...items.map((item) => item.value), 1);
-  return (
-    <Card>
-      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-      <CardContent className="grid gap-3">
-        {items.slice(0, 8).map((item) => (
-          <div key={item.label} className="grid gap-1.5" title={`${item.label}: ${format(item.value)}`}>
-            <div className="flex justify-between gap-4 text-xs">
-              <span className="truncate">{item.label}</span>
-              <span className="shrink-0 text-muted-foreground tabular-nums">{format(item.value)}</span>
-            </div>
-            <div className="h-2 rounded-2xl bg-muted">
-              <div className="h-2 rounded-2xl bg-primary" style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }} />
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
 type TrendPoint = { day: string; activeInstallations: number; newInstallations: number };
-
-const chart = { width: 720, height: 280, top: 16, right: 18, bottom: 42, left: 54 } as const;
-
-function chartStep(maximum: number) {
-  const roughStep = Math.max(1, maximum / 4);
-  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
-  const normalized = roughStep / magnitude;
-  const niceStep = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return niceStep * magnitude;
-}
 
 function shortDay(day: string) {
   const [, month, date] = day.split("-");

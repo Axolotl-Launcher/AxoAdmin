@@ -14,6 +14,7 @@ Axolotl 统一管理中心，独立于旧遥测 Dashboard，使用 Next.js、Rea
 - `CF_ACCESS_AUDIENCE`：Cloudflare Access 应用的唯一 audience/tag。
 - `SPONSOR_GATEWAY_ORIGIN`、`TELEMETRY_ADMIN_ORIGIN`：服务端可访问的上游 origin，分别提供 `/api/admin/*` 对应 API。
 - `SPONSOR_GATEWAY_ADMIN_TOKEN`：Sponsor Gateway 管理令牌，仅作为 Vercel Secret 配置，不提交代码或 `.env.local`。
+- `UPDATE_SERVER_ORIGIN`、`UPDATE_SERVER_ADMIN_TOKEN`：Axolotl Update Server 的 origin 与 `/api/admin/*` 管理令牌；令牌仅作为 Vercel Secret 配置，不要与 Sponsor Gateway 令牌复用。上游不可达时可另配 `UPDATE_SERVER_DIRECT_ORIGIN` 直连入口。
 
 Cloudflare Access 必须保护管理页面及 `/api/admin/*`，并使用 GitHub `axolotl-launcher` 组织策略。仅公开公告读取路径 `/api/public/announcements` 需要允许启动器匿名读取，不能被 Access 或 Vercel 登录页拦截；不要放开管理 API。Access 到 Vercel 的请求必须保留 `CF-Access-Jwt-Assertion`；应用会在服务端校验 issuer、audience 和 RS256 签名。仓库不包含 Vercel、Cloudflare 或 Verso 的远端配置，平台配置需要在对应控制台完成。
 
@@ -40,10 +41,25 @@ Supabase registry 生成的 `lib/client.ts`、`lib/server.ts` 可用于浏览器
 
 Vercel 项目 Settings → Environment Variables 中应为 Production 配置公告变量及现有 Access 变量，按需另配 Preview；修改后重新部署。生产环境不要启用 `AXOADMIN_MOCK_AUTH`。启动器若不使用默认公告域名，可在启动器构建环境配置 `VITE_AXO_ANNOUNCEMENTS_URL`；它不是 AxoAdmin 的 Vercel 环境变量。
 
+## 更新服务
+
+“更新”模块通过 `app/api/admin/updates/**` 代理 Axolotl Update Server（`https://update.axlmc.org`），并复用 Cloudflare Access 会话做鉴权。代理层使用显式路径白名单（`lib/api/update-server.ts`），未列出的路径与查询参数一律拒绝；版本号强制校验为规范化 SemVer。
+
+更新的公开读接口（`/api/versions`、`/api/downloads/*`、`/latest`、`/api/health`）不携带任何上游令牌，仅管理接口（版本撤销/恢复、发布审计）注入 `UPDATE_SERVER_ADMIN_TOKEN`。撤销与恢复的 `operator` 由服务端从 Cloudflare Access 会话取得，不接受浏览器传入，并在成功后写入本地 `audit_logs`。
+
+更新服务的错误响应体经常是空的（版本不存在返回 404、无更新返回 204、凭证无效返回 401，均为空 body），因此代理层会统一合成本面板自己的 JSON 错误信封，前端通过 `useUpdateApi` 区分 204（合法空结果）与真实失败。
+
+产物上传端点（`PUT /api/artifacts/<version>/<filename>`）**不接入本面板**：安装包体积在 55–135MB，超过 Vercel 请求体上限，且把上传令牌下发到浏览器会造成泄漏。维护性上传请继续在本地或 CI 完成。
+
+上游仅保留最新 3 个 Release 与 3 个 Beta 版本的产物，更早版本的 `/dist` 请求会 302 跳转到 GitHub Release，面板里对这类版本会给出提示。
+
+更新服务的 `/api/admin/stats` **未接入本面板**：该接口在上游会把区间内每一条 `usage_event`（当前约 52 万行）实例化后再在 Python 里遍历聚合，实测 24 小时区间需 5–9 秒、7 天与 30 天区间约 40 秒，无法支撑可用的管理界面。它的下载维度目前也没有数据来源——生产环境 `/dist` 由 Caddy 直接提供静态文件，请求不经过 Flask，`usage_event` 中 download 事件恒为 0，且 Caddyfile 未配置访问日志。若后续要恢复用量统计，应先在上游把聚合下推为 SQL `GROUP BY`（`app/routes/api.py` 的 `usage_stats`）、考虑切换到 WAL 模式，并启用 Caddy 访问日志。
+
 ## 模块
 
 - 工作台
 - 遥测中心
+- 更新
 - 赞助与权益
 - CDK 管理
 - API 运营

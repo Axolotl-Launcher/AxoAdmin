@@ -49,3 +49,46 @@ export type TelemetryOverview = z.infer<typeof telemetryOverviewSchema>;
 export type TelemetryActivity = z.infer<typeof telemetryActivitySchema>;
 export type TelemetryDistributions = z.infer<typeof telemetryDistributionsSchema>;
 export type TelemetrySystem = z.infer<typeof telemetrySystemSchema>;
+
+// 更新服务契约。注意 published_at 是无时区的本地风格时间（例如 2026-09-09T14:26:34），
+// 只有 /latest 的 pub_date 带 Z 后缀，因此这里不能使用 z.string().datetime()。
+export const updateHealthSchema = z.object({ service: z.string(), status: z.string() });
+export const updateArtifactSchema = z.object({
+  kind: z.string(), platform: z.string(), architecture: z.string(), variant: z.string(),
+  filename: z.string(), display_name: z.string(), content_type: z.string(), relative_path: z.string(),
+  sha256: z.string().nullable(), size: z.number(), sort_order: z.number(), is_public: z.boolean(),
+  signature: z.string().nullable(), signature_filename: z.string().nullable(),
+});
+export const updateVersionSchema = z.object({
+  version: z.string(), channel: z.string(), status: z.string(), notes: z.string().nullable(),
+  release_tag: z.string().nullable(), release_id: z.string().nullable(), published_at: z.string(),
+  minimum_version: z.string().nullable(), force_update: z.boolean(), artifacts: z.array(updateArtifactSchema),
+});
+export const updateVersionListSchema = z.object({ versions: z.array(updateVersionSchema) });
+export const updateDownloadSchema = z.object({
+  id: z.number(), kind: z.string(), platform: z.string(), architecture: z.string(), variant: z.string(),
+  label: z.string(), display_name: z.string(), sort_order: z.number(), filename: z.string(), url: z.string(),
+  size: z.number(), sha256: z.string().nullable(), signature: z.string().nullable(), signature_filename: z.string().nullable(),
+});
+export const updateDownloadsSchema = z.object({
+  version: z.string(), channel: z.string(), status: z.string(), published_at: z.string(),
+  force_update: z.boolean(), downloads: z.array(updateDownloadSchema),
+});
+export const updateManifestSchema = z.object({
+  version: z.string(), notes: z.string().nullable(), pub_date: z.string(), published_at: z.string(),
+  force_update: z.boolean(), platforms: z.record(z.string(), z.object({ signature: z.string(), url: z.string() })),
+});
+export const updateAuditLogsSchema = z.object({
+  logs: z.array(z.object({
+    operator: z.string(), action: z.string(), channel: z.string(), version: z.string(),
+    reason: z.string().nullable(), request_id: z.string(), ip_address: z.string(), created_at: z.string(),
+  })),
+});
+
+export type UpdateHealth = z.infer<typeof updateHealthSchema>;
+export type UpdateArtifact = z.infer<typeof updateArtifactSchema>;
+export type UpdateVersion = z.infer<typeof updateVersionSchema>;
+export type UpdateDownload = z.infer<typeof updateDownloadSchema>;
+export type UpdateDownloads = z.infer<typeof updateDownloadsSchema>;
+export type UpdateManifest = z.infer<typeof updateManifestSchema>;
+export type UpdateAuditLogs = z.infer<typeof updateAuditLogsSchema>;
