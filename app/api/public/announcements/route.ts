@@ -10,7 +10,17 @@ export async function GET(request: Request) {
     const rows: Announcement[] = await (await db("announcements?" + params)).json();
     const query = new URL(request.url).searchParams;
     const announcements = rows.filter(item => (!item.target_version || item.target_version === query.get("version")) && (!item.target_channel || item.target_channel === query.get("channel"))).sort((first, second) => rank[second.priority] - rank[first.priority]);
-    return Response.json({ announcements }, { headers: { "Cache-Control": "public, max-age=0, s-maxage=30", "Access-Control-Allow-Origin": "*" } });
+    return Response.json(
+      { announcements },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=7200, s-maxage=7200, stale-while-revalidate=86400",
+          "Cloudflare-CDN-Cache-Control": "public, max-age=7200",
+          "CDN-Cache-Control": "public, max-age=7200",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   } catch (error) {
     const response = failure(error);
     response.headers.set("Cache-Control", "no-store");
