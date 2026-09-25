@@ -6,11 +6,23 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Distribution } from "@/components/dashboard/distribution";
 import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAdminData } from "@/lib/api/use-admin-data";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  CartesianGrid,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { telemetryActivitySchema, telemetryDistributionsSchema, telemetryOverviewSchema } from "@/lib/api/schemas";
 
 const ranges = ["7d", "30d", "90d", "365d"] as const;
@@ -19,6 +31,17 @@ const format = (value: number) => number.format(value);
 
 type TrendPoint = { day: string; activeInstallations: number; newInstallations: number };
 
+const trendChartConfig = {
+  activeInstallations: {
+    label: "活跃安装",
+    color: "var(--chart-1)",
+  },
+  newInstallations: {
+    label: "新增安装",
+    color: "var(--chart-2)",
+  },
+} satisfies ChartConfig;
+
 function shortDay(day: string) {
   const [, month, date] = day.split("-");
   return month && date ? `${Number(month)}/${Number(date)}` : day;
@@ -26,7 +49,44 @@ function shortDay(day: string) {
 
 function Trend({ points }: { points: TrendPoint[] }) {
   const settled = points.filter((point) => point.day < new Date().toISOString().slice(0, 10));
-  return <Card><CardHeader><CardTitle>每日使用者趋势</CardTitle></CardHeader><CardContent>{settled.length === 0 ? <AdminEmpty label="当前范围没有已结算趋势数据。" /> : <><p className="mb-3 text-xs text-muted-foreground">按 UTC 自然日统计；本日数据将在次日结算后显示，悬浮查看详细数据。</p><ChartContainer><ResponsiveContainer width="100%" height="100%"><LineChart data={settled.map((point) => ({...point, day: shortDay(point.day)}))}><CartesianGrid vertical={false} /><XAxis dataKey="day" /><YAxis /><ChartTooltip content={<ChartTooltipContent />} /><Line type="monotone" dataKey="activeInstallations" name="活跃安装" stroke="var(--chart-1)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="newInstallations" name="新增安装" stroke="var(--chart-2)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></ChartContainer></>}</CardContent></Card>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>每日使用者趋势</CardTitle>
+        <CardDescription>按 UTC 自然日统计；本日数据将在次日结算后显示，悬浮可查看当日对比。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {settled.length === 0 ? (
+          <AdminEmpty label="当前范围没有已结算趋势数据。" />
+        ) : (
+          <ChartContainer config={trendChartConfig} className="h-[280px] w-full">
+            <LineChart data={settled.map((point) => ({ ...point, day: shortDay(point.day) }))}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="day" />
+              <YAxis />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Line
+                type="monotone"
+                dataKey="activeInstallations"
+                stroke="var(--color-activeInstallations)"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="newInstallations"
+                stroke="var(--color-newInstallations)"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function Telemetry() {
@@ -44,6 +104,7 @@ export default function Telemetry() {
     ["月活跃安装", metric.mau.value, metric.mau.label, Users, "blue"],
     ["今日新增安装", metric.newInstallationsToday.value, metric.newInstallationsToday.label, PackagePlus, "green"],
   ] as const : [], [metric]);
+
   return (
     <div className="grid gap-4">
       <PageHeader title="遥测中心" description="查看主动同意遥测的匿名安装、活跃度与运行环境分布。">
@@ -59,13 +120,30 @@ export default function Telemetry() {
           <RefreshCw className="size-4" />
         </Button>
       </PageHeader>
+
       {(overview.loading || activity.loading || distributions.loading) && <AdminLoading label="正在加载遥测数据…" />}
       {(overview.error || activity.error || distributions.error) && (
         <AdminError message={overview.error || activity.error || distributions.error || "遥测数据加载失败。"} onRetry={reload} />
       )}
-      {overview.data && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{cards.map(([label, value, detail, Icon, tone]) => <StatCard key={label} label={label} value={format(value)} detail={detail} icon={Icon} tone={tone} />)}</div>}
+
+      {overview.data && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {cards.map(([label, value, detail, Icon, tone]) => (
+            <StatCard key={label} label={label} value={format(value)} detail={detail} icon={Icon} tone={tone} />
+          ))}
+        </div>
+      )}
+
       {activity.data && <Trend points={activity.data.points} />}
-      {distributions.data && <div className="grid gap-4 lg:grid-cols-3"><Distribution title="版本使用情况" items={distributions.data.versions} /><Distribution title="平台分布" items={distributions.data.platforms} /><Distribution title="架构分布" items={distributions.data.architectures} /></div>}
+
+      {distributions.data && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Distribution title="版本使用情况" items={distributions.data.versions} />
+          <Distribution title="平台分布" items={distributions.data.platforms} />
+          <Distribution title="架构分布" items={distributions.data.architectures} />
+        </div>
+      )}
+
       {!overview.loading && !overview.error && !overview.data && <AdminEmpty label="暂无遥测数据。" />}
     </div>
   );

@@ -2,10 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, Coins, Command, GitBranch, History, KeyRound, LayoutDashboard, Package, ReceiptText, Server, Settings, ShieldCheck, Users } from "lucide-react";
+import {
+  Activity,
+  Bell,
+  Coins,
+  Command,
+  GitBranch,
+  History,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  ReceiptText,
+  Server,
+  Settings,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -19,6 +36,16 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,18 +74,41 @@ function matchItem(pathname: string) {
     .sort((a, b) => b.item.href.length - a.item.href.length)[0];
 }
 
-function currentTitle(pathname: string) {
-  const active = matchItem(pathname);
-  return active ? `${active.group.label} / ${active.item.label}` : "AxoAdmin";
+function getBreadcrumbs(pathname: string) {
+  const match = matchItem(pathname);
+  if (!match) return [{ label: "工作台", href: "/" }];
+
+  const items = [{ label: match.group.label, href: match.item.href }];
+
+  // If path is an exact match for the menu item
+  if (pathname === match.item.href) {
+    items.push({ label: match.item.label, href: "" });
+    return items;
+  }
+
+  items.push({ label: match.item.label, href: match.item.href });
+
+  // Handle sub-pages
+  if (pathname.startsWith("/updates/") && pathname !== "/updates/channels" && pathname !== "/updates/audit") {
+    const version = decodeURIComponent(pathname.replace("/updates/", ""));
+    items.push({ label: version, href: "" });
+  } else if (pathname.startsWith("/sponsors/users/") && pathname !== "/sponsors/users") {
+    items.push({ label: "用户详情", href: "" });
+  }
+
+  return items;
 }
 
-function ShellSidebar() {
+function ShellSidebar({ session }: { session: AdminSession | null }) {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false);
   };
   const activeItem = matchItem(pathname)?.item;
+
+  const userInitial = (session?.identity.name || session?.identity.email || "A").slice(0, 2).toUpperCase();
+
   return (
     <>
       <SidebarHeader>
@@ -103,6 +153,26 @@ function ShellSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
+      {session && (
+        <SidebarFooter>
+          <div className="flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5">
+            <Avatar className="size-7 rounded-lg">
+              <AvatarFallback className="rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                {userInitial}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-medium">{session.identity.name || session.identity.email}</span>
+              <span className="truncate text-[10px] text-muted-foreground">{session.identity.email || "已认证管理员"}</span>
+            </div>
+            <Button asChild variant="ghost" size="icon-xs" className="shrink-0 group-data-[collapsible=icon]:hidden" title="退出登录">
+              <a href={session.logoutUrl} aria-label="退出登录">
+                <LogOut className="size-3.5 text-muted-foreground hover:text-foreground" />
+              </a>
+            </Button>
+          </div>
+        </SidebarFooter>
+      )}
     </>
   );
 }
@@ -110,29 +180,49 @@ function ShellSidebar() {
 export function AdminShell({ children, session }: { children: React.ReactNode; session: AdminSession | null }) {
   const pathname = usePathname();
   if (pathname === "/login") return <>{children}</>;
+
+  const breadcrumbs = getBreadcrumbs(pathname);
+
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarProvider>
         <Sidebar collapsible="icon" variant="inset">
-          <ShellSidebar />
+          <ShellSidebar session={session} />
           <SidebarRail />
         </Sidebar>
         <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 px-4 sm:px-6">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-            <div className="flex min-w-0 flex-col">
-              <p className="truncate text-sm font-medium">{currentTitle(pathname)}</p>
-              <p className="hidden truncate text-xs text-muted-foreground sm:block">统一运营与管理控制台</p>
+          <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4 sm:px-6">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  {breadcrumbs.map((crumb, index) => {
+                    const isLast = index === breadcrumbs.length - 1;
+                    return (
+                      <span key={index} className="inline-flex items-center gap-1.5 sm:gap-2">
+                        {index > 0 && <BreadcrumbSeparator />}
+                        <BreadcrumbItem>
+                          {isLast || !crumb.href ? (
+                            <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink asChild>
+                              <Link href={crumb.href}>{crumb.label}</Link>
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                      </span>
+                    );
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {session ? (
                 <>
-                  <span className="hidden max-w-48 truncate text-xs text-muted-foreground md:block">{session.identity.email ?? session.identity.name}</span>
-                  <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 lg:flex dark:text-emerald-400">
-                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                  <Badge variant="success" className="hidden sm:inline-flex">
                     已认证
-                  </span>
+                  </Badge>
                   <ThemeToggle />
                   <Button asChild variant="outline" size="sm">
                     <a href={session.logoutUrl}>退出</a>
@@ -140,7 +230,7 @@ export function AdminShell({ children, session }: { children: React.ReactNode; s
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-destructive">未认证</span>
+                  <Badge variant="destructive">未认证</Badge>
                   <ThemeToggle />
                   <Button asChild variant="outline" size="sm">
                     <Link href="/">登录</Link>
@@ -155,4 +245,3 @@ export function AdminShell({ children, session }: { children: React.ReactNode; s
     </TooltipProvider>
   );
 }
-

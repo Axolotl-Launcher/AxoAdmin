@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { AdminEmpty, AdminError, TableSkeleton } from "@/components/dashboard/admin-state";
 import { ToneBadge } from "@/components/dashboard/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,49 +49,81 @@ export default function UsersPage() {
     setPage(1);
   };
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+
+  const hasFilter = Boolean(search || status || entitlement);
+
   return (
     <div className="grid gap-4">
       <PageHeader title="用户" description="查看 Sponsor Gateway 中的用户、赞助金额、权益和 API 用量。" />
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full min-w-52 flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => applySearch(event.target.value)} placeholder="搜索邮箱" className="pl-8" aria-label="搜索邮箱" />
-          </div>
-          <Select value={status} onValueChange={(value) => { setStatus(value === "all" ? "" : value); setPage(1); }}>
-            <SelectTrigger className="w-40" aria-label="用户状态">
-              <SelectValue placeholder="全部用户状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部用户状态</SelectItem>
-              <SelectItem value="active">活跃</SelectItem>
-              <SelectItem value="suspended">已暂停</SelectItem>
-              <SelectItem value="blocked">已封禁</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={entitlement} onValueChange={(value) => { setEntitlement(value === "all" ? "" : value); setPage(1); }}>
-            <SelectTrigger className="w-40" aria-label="权益状态">
-              <SelectValue placeholder="全部权益状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部权益状态</SelectItem>
-              <SelectItem value="granted">已授权</SelectItem>
-              <SelectItem value="pending">待定</SelectItem>
-              <SelectItem value="suspended">已暂停</SelectItem>
-              <SelectItem value="manual_review">人工审核</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatus(""); setEntitlement(""); setPage(1); }}>
-            <RotateCcw data-icon="inline-start" />
-            重置
-          </Button>
-        </CardContent>
-      </Card>
-      {loading && <AdminLoading label="正在加载用户…" />}
+
       {error && <AdminError message={error} onRetry={reload} />}
-      {data && data.items.length === 0 && <AdminEmpty label="没有符合条件的用户。" hint="调整筛选条件后重试。" />}
-      {data && data.items.length > 0 && (
-        <Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-4 border-b pb-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>用户列表</CardTitle>
+              <CardDescription>管理用户账户状态、权益授权及关联凭证。</CardDescription>
+            </div>
+            {data && (
+              <span className="text-xs text-muted-foreground">共 {data.total} 位注册用户</span>
+            )}
+          </div>
+          {/* Table Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="relative w-full min-w-48 sm:w-64">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => applySearch(event.target.value)}
+                placeholder="搜索邮箱"
+                className="pl-8"
+                aria-label="搜索邮箱"
+              />
+            </div>
+            <Select value={status || "all"} onValueChange={(value) => { setStatus(value === "all" ? "" : value); setPage(1); }}>
+              <SelectTrigger className="w-36" aria-label="用户状态">
+                <SelectValue placeholder="全部状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部状态</SelectItem>
+                <SelectItem value="active">活跃</SelectItem>
+                <SelectItem value="suspended">已暂停</SelectItem>
+                <SelectItem value="blocked">已封禁</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={entitlement || "all"} onValueChange={(value) => { setEntitlement(value === "all" ? "" : value); setPage(1); }}>
+              <SelectTrigger className="w-36" aria-label="权益状态">
+                <SelectValue placeholder="全部权益" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部权益</SelectItem>
+                <SelectItem value="granted">已授权</SelectItem>
+                <SelectItem value="pending">待定</SelectItem>
+                <SelectItem value="suspended">已暂停</SelectItem>
+                <SelectItem value="manual_review">人工审核</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSearch(""); setStatus(""); setEntitlement(""); setPage(1); }}
+              >
+                <RotateCcw data-icon="inline-start" />
+                重置
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+
+        {loading ? (
+          <div className="p-4">
+            <TableSkeleton rows={6} />
+          </div>
+        ) : !data || data.items.length === 0 ? (
+          <AdminEmpty label="没有符合条件的用户。" hint={hasFilter ? "尝试调整搜索关键词或筛选条件后重试。" : "系统目前尚无注册用户。"} />
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -128,33 +160,36 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
-      {data && data.total > data.page_size && (
-        <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-          <p className="text-sm text-muted-foreground">共 {data.total} 位用户 · 第 {data.page} / {totalPages} 页</p>
-          <Pagination className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  text="上一页"
-                  className={page <= 1 ? "pointer-events-none opacity-40" : undefined}
-                  aria-disabled={page <= 1}
-                  onClick={(event) => { event.preventDefault(); setPage((value) => Math.max(1, value - 1)); }}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  text="下一页"
-                  className={page >= totalPages ? "pointer-events-none opacity-40" : undefined}
-                  aria-disabled={page >= totalPages}
-                  onClick={(event) => { event.preventDefault(); setPage((value) => Math.min(totalPages, value + 1)); }}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+        )}
+
+        {data && data.total > 0 && (
+          <CardFooter className="flex flex-col items-center justify-between gap-3 border-t py-3 sm:flex-row">
+            <p className="text-xs text-muted-foreground">共 {data.total} 位用户 · 第 {data.page} / {totalPages} 页</p>
+            {data.total > data.page_size && (
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      text="上一页"
+                      className={page <= 1 ? "pointer-events-none opacity-40" : undefined}
+                      aria-disabled={page <= 1}
+                      onClick={(event) => { event.preventDefault(); setPage((value) => Math.max(1, value - 1)); }}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      text="下一页"
+                      className={page >= totalPages ? "pointer-events-none opacity-40" : undefined}
+                      aria-disabled={page >= totalPages}
+                      onClick={(event) => { event.preventDefault(); setPage((value) => Math.min(totalPages, value + 1)); }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </CardFooter>
+        )}
+      </Card>
     </div>
   );
 }

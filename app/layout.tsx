@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAdminSession } from "@/lib/auth/access";
 
+import { Toaster } from "@/components/ui/sonner";
+
 const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-sans" });
 export const metadata: Metadata = { title: "AxoAdmin · Axolotl 管理中心", description: "Axolotl 统一管理中心" };
 
@@ -21,6 +23,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className={inter.variable}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AdminShell session={session}>{children}</AdminShell>
+          <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>
     </html>

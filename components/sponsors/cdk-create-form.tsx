@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Copy, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export function CdkCreateForm({ onCreated }: { onCreated?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -27,10 +28,14 @@ export function CdkCreateForm({ onCreated }: { onCreated?: () => void }) {
       });
       const body = (await response.json()) as { cdks?: string[]; message?: string };
       if (!response.ok) throw new Error(body.message ?? "生成失败");
-      setResult(body.cdks ?? []);
+      const cdks = body.cdks ?? [];
+      setResult(cdks);
+      toast.success(`成功生成 ${cdks.length} 个 CDK`);
       onCreated?.();
     } catch (error) {
-      setResult([error instanceof Error ? error.message : "生成失败"]);
+      const message = error instanceof Error ? error.message : "生成失败";
+      setResult([message]);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -38,10 +43,12 @@ export function CdkCreateForm({ onCreated }: { onCreated?: () => void }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) { setResult([]); setBusy(false); } }}>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus data-icon="inline-start" />
-        生成 CDK
-      </Button>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus data-icon="inline-start" />
+          生成 CDK
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>生成 CDK</DialogTitle>
@@ -68,7 +75,7 @@ export function CdkCreateForm({ onCreated }: { onCreated?: () => void }) {
               {result.map((code, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <Input readOnly value={code} className="font-mono text-xs" aria-label={`CDK ${index + 1}`} />
-                  <Button type="button" variant="outline" size="icon-sm" onClick={() => navigator.clipboard.writeText(code)} aria-label="复制 CDK">
+                  <Button type="button" variant="outline" size="icon-sm" onClick={() => { navigator.clipboard.writeText(code); toast.success("CDK 已复制到剪贴板"); }} aria-label="复制 CDK">
                     <Copy />
                   </Button>
                 </div>

@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { AdminEmpty, AdminError, TableSkeleton } from "@/components/dashboard/admin-state";
 import { ToneBadge } from "@/components/dashboard/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,33 +33,44 @@ export default function Orders() {
   }, [page, status]);
   const { data, error, loading, reload } = useAdminData(query, orderPageSchema);
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+
   return (
     <div className="grid gap-4">
       <PageHeader title="赞助订单" description="查看已验证的爱发电订单和用户权益来源。" />
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3">
-          <Select value={status} onValueChange={(value) => { setStatus(value === "all" ? "" : value); setPage(1); }}>
-            <SelectTrigger className="w-44" aria-label="订单状态">
-              <SelectValue placeholder="全部订单状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部订单状态</SelectItem>
-              <SelectItem value="paid">已支付</SelectItem>
-              <SelectItem value="success">成功</SelectItem>
-              <SelectItem value="pending">处理中</SelectItem>
-              <SelectItem value="refunded">已退款</SelectItem>
-              <SelectItem value="revoked">已撤销</SelectItem>
-              <SelectItem value="cancelled">已取消</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="ml-auto text-xs text-muted-foreground">金额均以人民币展示，数据来自 fen。</span>
-        </CardContent>
-      </Card>
-      {loading && <AdminLoading label="正在加载订单…" />}
+
       {error && <AdminError message={error} onRetry={reload} />}
-      {data && data.items.length === 0 && <AdminEmpty label="没有符合条件的订单。" />}
-      {data && data.items.length > 0 && (
-        <Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+          <div>
+            <CardTitle>订单列表</CardTitle>
+            <CardDescription>金额均以人民币展示，来自 fen 精度结算。</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={status || "all"} onValueChange={(value) => { setStatus(value === "all" ? "" : value); setPage(1); }}>
+              <SelectTrigger className="w-40" aria-label="订单状态">
+                <SelectValue placeholder="全部订单状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部订单状态</SelectItem>
+                <SelectItem value="paid">已支付</SelectItem>
+                <SelectItem value="success">成功</SelectItem>
+                <SelectItem value="pending">处理中</SelectItem>
+                <SelectItem value="refunded">已退款</SelectItem>
+                <SelectItem value="revoked">已撤销</SelectItem>
+                <SelectItem value="cancelled">已取消</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+
+        {loading ? (
+          <div className="p-4">
+            <TableSkeleton rows={5} />
+          </div>
+        ) : !data || data.items.length === 0 ? (
+          <AdminEmpty label="没有符合条件的订单。" hint={status ? "切换状态筛选后重试。" : "暂无已完成或同步的订单记录。"} />
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -83,33 +94,36 @@ export default function Orders() {
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
-      {data && data.total > data.page_size && (
-        <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-          <p className="text-sm text-muted-foreground">共 {data.total} 笔订单 · 第 {data.page} / {totalPages} 页</p>
-          <Pagination className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  text="上一页"
-                  className={page <= 1 ? "pointer-events-none opacity-40" : undefined}
-                  aria-disabled={page <= 1}
-                  onClick={(event) => { event.preventDefault(); setPage((value) => Math.max(1, value - 1)); }}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  text="下一页"
-                  className={page >= totalPages ? "pointer-events-none opacity-40" : undefined}
-                  aria-disabled={page >= totalPages}
-                  onClick={(event) => { event.preventDefault(); setPage((value) => Math.min(totalPages, value + 1)); }}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+        )}
+
+        {data && data.total > 0 && (
+          <CardFooter className="flex flex-col items-center justify-between gap-3 border-t py-3 sm:flex-row">
+            <p className="text-xs text-muted-foreground">共 {data.total} 笔订单 · 第 {data.page} / {totalPages} 页</p>
+            {data.total > data.page_size && (
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      text="上一页"
+                      className={page <= 1 ? "pointer-events-none opacity-40" : undefined}
+                      aria-disabled={page <= 1}
+                      onClick={(event) => { event.preventDefault(); setPage((value) => Math.max(1, value - 1)); }}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      text="下一页"
+                      className={page >= totalPages ? "pointer-events-none opacity-40" : undefined}
+                      aria-disabled={page >= totalPages}
+                      onClick={(event) => { event.preventDefault(); setPage((value) => Math.min(totalPages, value + 1)); }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </CardFooter>
+        )}
+      </Card>
     </div>
   );
 }

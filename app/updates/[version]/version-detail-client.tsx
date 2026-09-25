@@ -6,7 +6,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, ExternalLink, RefreshCw, RotateCcw, ShieldOff } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ToneBadge, type Tone } from "@/components/dashboard/status-badge";
-import { AdminEmpty, AdminError, AdminLoading } from "@/components/dashboard/admin-state";
+import { AdminEmpty, AdminError, TableSkeleton } from "@/components/dashboard/admin-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,14 +52,27 @@ export default function VersionDetailClient({ version }: { version: string }) {
   return (
     <div className="grid min-w-0 gap-6">
       <PageHeader title={data?.version ?? version} description="查看该版本的元数据、Release notes 与全部产物，并可以撤销或恢复它。">
-        <Button asChild variant="outline"><Link href="/updates"><ArrowLeft />返回列表</Link></Button>
-        <Button variant="outline" disabled={busy} onClick={reload}><RefreshCw className={busy ? "animate-spin" : undefined} />刷新</Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/updates">
+            <ArrowLeft data-icon="inline-start" />
+            返回列表
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy} onClick={reload}>
+          <RefreshCw className={busy ? "animate-spin" : undefined} />
+          刷新
+        </Button>
         {data && (data.status === "revoked"
-          ? <Button onClick={() => setRestoring(true)}><RotateCcw />恢复版本</Button>
-          : <Button variant="destructive" onClick={() => setRevoking(true)}><ShieldOff />撤销版本</Button>)}
+          ? <Button size="sm" onClick={() => setRestoring(true)}><RotateCcw data-icon="inline-start" />恢复版本</Button>
+          : <Button variant="destructive" size="sm" onClick={() => setRevoking(true)}><ShieldOff data-icon="inline-start" />撤销版本</Button>)}
       </PageHeader>
 
-      {detail.loading && !data && <AdminLoading label="正在加载版本信息…" />}
+      {detail.loading && !data && (
+        <div className="space-y-4">
+          <Card className="h-44 animate-pulse bg-muted/30" />
+          <TableSkeleton rows={5} />
+        </div>
+      )}
       {detail.error && <AdminError message={detail.error} onRetry={reload} />}
 
       {data && (
@@ -90,53 +103,58 @@ export default function VersionDetailClient({ version }: { version: string }) {
             </CardContent>
           </Card>
 
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>产物清单</CardTitle>
-              <CardDescription>包含签名等非公开文件；只有带有效 Tauri 签名的更新器产物会出现在更新清单里。</CardDescription>
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="border-b pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle>产物清单</CardTitle>
+                  <CardDescription>包含签名等非公开文件；只有带有效 Tauri 签名的更新器产物会出现在更新清单里。</CardDescription>
+                </div>
+                {kinds.length > 1 && (
+                  <Select value={kind} onValueChange={setKind}>
+                    <SelectTrigger className="w-40" aria-label="筛选产物类型"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部类型</SelectItem>
+                      {kinds.map((value) => <SelectItem key={value} value={value}>{kindNames[value] ?? value}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="grid min-w-0 gap-4">
-              {kinds.length > 1 && (
-                <Select value={kind} onValueChange={setKind}>
-                  <SelectTrigger className="w-40" aria-label="筛选产物类型"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部类型</SelectItem>
-                    {kinds.map((value) => <SelectItem key={value} value={value}>{kindNames[value] ?? value}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-              {artifacts.length === 0 ? <AdminEmpty label="该版本没有产物记录。" /> : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>类型</TableHead>
-                      <TableHead>平台 / 架构</TableHead>
-                      <TableHead>文件</TableHead>
-                      <TableHead>大小</TableHead>
-                      <TableHead>SHA-256</TableHead>
+
+            {artifacts.length === 0 ? (
+              <AdminEmpty label="该版本没有产物记录。" />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>类型</TableHead>
+                    <TableHead>平台 / 架构</TableHead>
+                    <TableHead>文件</TableHead>
+                    <TableHead>大小</TableHead>
+                    <TableHead>SHA-256</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {artifacts.map((item) => (
+                    <TableRow key={item.filename}>
+                      <TableCell>
+                        <ToneBadge tone={kindTones[item.kind] ?? "neutral"}>{kindNames[item.kind] ?? item.kind}</ToneBadge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {item.platform || "—"}{item.architecture ? " / " + item.architecture : ""}{item.variant ? " · " + item.variant : ""}
+                      </TableCell>
+                      <TableCell className="max-w-72 break-all">
+                        <p className="font-medium">{item.display_name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.is_public ? "公开" : "非公开"}{item.signature ? " · 含 Tauri 签名" : ""}</p>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatBytes(item.size)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground" title={item.sha256 ?? ""}>{shortDigest(item.sha256)}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {artifacts.map((item) => (
-                      <TableRow key={item.filename}>
-                        <TableCell>
-                          <ToneBadge tone={kindTones[item.kind] ?? "neutral"}>{kindNames[item.kind] ?? item.kind}</ToneBadge>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                          {item.platform || "—"}{item.architecture ? " / " + item.architecture : ""}{item.variant ? " · " + item.variant : ""}
-                        </TableCell>
-                        <TableCell className="max-w-72 break-all">
-                          <p className="font-medium">{item.display_name}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{item.is_public ? "公开" : "非公开"}{item.signature ? " · 含 Tauri 签名" : ""}</p>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatBytes(item.size)}</TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground" title={item.sha256 ?? ""}>{shortDigest(item.sha256)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </Card>
 
           <Card className="min-w-0">

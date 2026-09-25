@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const count = new Intl.NumberFormat("zh-CN");
 
@@ -19,9 +20,7 @@ export function Distribution({ title, items, empty = "当前范围暂无数据�
               <span className="truncate">{item.label}</span>
               <span className="shrink-0 text-muted-foreground tabular-nums">{count.format(item.value)}</span>
             </div>
-            <div className="h-2 rounded-2xl bg-muted">
-              <div className="h-2 rounded-2xl bg-primary" style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }} />
-            </div>
+            <Progress value={Math.max((item.value / max) * 100, 2)} className="h-2" />
           </div>
         ))}
       </CardContent>
