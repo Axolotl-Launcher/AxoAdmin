@@ -4,5 +4,6 @@
 !.env.example
 node_modules/
 .next/
+.workbuddy/
 out/
 tsconfig.tsbuildinfo
