@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ZodError } from "zod";
 import type { z } from "zod";
 
@@ -50,31 +50,37 @@ async function explain(response: Response) {
 // 更新服务的 204（无更新 / 无可下载包）是合法结果而不是错误，
 // 因此这里把状态码一并返回，让页面能区分「已是最新」与真正的失败。
 export function useUpdateApi<T>(path: string, schema: z.ZodType<T>, enabled = true) {
-  const [data, setData] = useState<T | null>(null);
-  const [status, setStatus] = useState<number | null>(null);
+  const [snapshot, setSnapshot] = useState<{ data: T | null; status: number; path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(enabled);
-  const reload = useCallback(() => {
-    if (!enabled) return;
-    let cancelled = false;
+  const sequence = useRef(0);
+  const active = useRef<AbortController | null>(null);
+  const reload = useCallback(async () => {
+    if (!enabled) { setLoading(false); return false; }
+    const request = ++sequence.current;
+    active.current?.abort();
+    const controller = new AbortController();
+    active.current = controller;
     setLoading(true);
     setError(null);
-    fetch(path, { cache: "no-store" })
-      .then(async (response) => {
-        if (!cancelled) setStatus(response.status);
-        if (response.status === 204) return null;
-        if (!response.ok) throw new Error(await explain(response));
-        return schema.parse(await response.json());
-      })
-      .then((value) => { if (!cancelled) setData(value); })
-      .catch((error) => {
-        if (cancelled) return;
-        setData(null);
-        setError(error instanceof ZodError ? EMPTY_DATA : error instanceof Error ? error.message : describe(0));
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    try {
+      const response = await fetch(path, { cache: "no-store", signal: controller.signal });
+      if (!response.ok && response.status !== 204) throw new Error(await explain(response));
+      const data = response.status === 204 ? null : schema.parse(await response.json());
+      if (request !== sequence.current || controller.signal.aborted) return false;
+      setSnapshot({ data, status: response.status, path });
+      return true;
+    } catch (error) {
+      if (request !== sequence.current || controller.signal.aborted) return false;
+      setError(error instanceof ZodError ? EMPTY_DATA : error instanceof Error ? error.message : describe(0));
+      return false;
+    } finally {
+      if (request === sequence.current && !controller.signal.aborted) setLoading(false);
+    }
   }, [enabled, path, schema]);
-  useEffect(() => reload(), [reload]);
-  return { data, status, error, loading, reload };
+  useEffect(() => {
+    void reload();
+    return () => { active.current?.abort(); };
+  }, [reload]);
+  return { data: snapshot?.data ?? null, status: snapshot?.status ?? null, committedPath: snapshot?.path ?? null, error, loading, reload };
 }

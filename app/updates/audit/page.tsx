@@ -12,8 +12,8 @@ import { useUpdateApi } from "@/lib/api/use-admin-data";
 import { updateAuditLogsSchema } from "@/lib/api/schemas";
 import { formatDateTime, shortDigest } from "@/lib/updates/format";
 
-const actionNames: Record<string, string> = { revoke: "撤销版本", restore: "恢复版本" };
-const actionTones: Record<string, Tone> = { revoke: "red", restore: "green" };
+const actionNames: Record<string, string> = { revoke: "撤销版本", restore: "恢复版本", force_update_enabled: "启用强制更新", force_update_disabled: "关闭强制更新", delete_version: "删除版本" };
+const actionTones: Record<string, Tone> = { revoke: "red", restore: "green", force_update_enabled: "amber", force_update_disabled: "neutral", delete_version: "red" };
 
 export default function Audit() {
   const audit = useUpdateApi("/api/admin/updates/audit-logs", updateAuditLogsSchema);
@@ -21,7 +21,7 @@ export default function Audit() {
 
   return (
     <div className="grid min-w-0 gap-6">
-      <PageHeader title="发布审计" description="由更新服务记录的版本撤销与恢复操作，用于追溯一次发布被下线的原因。">
+      <PageHeader title="发布审计" description="追溯撤销、恢复、强制更新与版本删除的操作记录。">
         <Button variant="outline" size="sm" disabled={audit.loading} onClick={audit.reload}>
           <RefreshCw className={audit.loading ? "animate-spin" : undefined} />
           刷新
@@ -32,8 +32,8 @@ export default function Audit() {
 
       <Card className="min-w-0 overflow-hidden">
         <CardHeader className="border-b pb-4">
-          <CardTitle>撤销与恢复记录</CardTitle>
-          <CardDescription>只包含更新服务的撤销与恢复操作；浏览器侧的对应操作同时会写入平台审计日志。</CardDescription>
+          <CardTitle>版本管理记录</CardTitle>
+          <CardDescription>由更新服务记录；通过本面板执行的操作也会写入平台审计。</CardDescription>
         </CardHeader>
 
         {audit.loading ? (
@@ -41,7 +41,7 @@ export default function Audit() {
             <TableSkeleton rows={5} />
           </div>
         ) : logs.length === 0 ? (
-          <AdminEmpty label="还没有任何撤销或恢复记录。" hint="发布版本并触发撤销后，记录会出现在这里。" />
+          <AdminEmpty label="还没有版本管理记录。" hint="执行版本管理操作后会显示在这里。" />
         ) : (
           <Table>
             <TableHeader>
@@ -62,12 +62,12 @@ export default function Audit() {
                   <TableCell className="max-w-48 truncate text-xs" title={log.operator}>{log.operator || "—"}</TableCell>
                   <TableCell><ToneBadge tone={actionTones[log.action] ?? "neutral"}>{actionNames[log.action] ?? log.action}</ToneBadge></TableCell>
                   <TableCell className="whitespace-nowrap">
-                    <Link href={`/updates/${log.version}`} className="font-medium hover:underline">{log.version}</Link>
+                    {log.version && log.action !== "delete_version" ? <Link href={`/updates/${encodeURIComponent(log.version)}`} className="font-medium hover:underline">{log.version}</Link> : <span>{log.version ?? "—"}</span>}
                     <p className="mt-1 text-xs text-muted-foreground">{log.channel}</p>
                   </TableCell>
                   <TableCell className="max-w-72 whitespace-normal text-xs text-muted-foreground">{log.reason || "未填写"}</TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{log.ip_address || "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground" title={log.request_id}>{shortDigest(log.request_id)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground" title={log.request_id ?? undefined}>{shortDigest(log.request_id)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

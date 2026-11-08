@@ -50,18 +50,18 @@ export type TelemetryActivity = z.infer<typeof telemetryActivitySchema>;
 export type TelemetryDistributions = z.infer<typeof telemetryDistributionsSchema>;
 export type TelemetrySystem = z.infer<typeof telemetrySystemSchema>;
 
-// 更新服务契约。注意 published_at 是无时区的本地风格时间（例如 2026-09-09T14:26:34），
-// 只有 /latest 的 pub_date 带 Z 后缀，因此这里不能使用 z.string().datetime()。
+// Go returns UTC timestamps; retain support for legacy timestamps and unpublished null dates.
 export const updateHealthSchema = z.object({ service: z.string(), status: z.string() });
 export const updateArtifactSchema = z.object({
   kind: z.string(), platform: z.string(), architecture: z.string(), variant: z.string(),
   filename: z.string(), display_name: z.string(), content_type: z.string(), relative_path: z.string(),
   sha256: z.string().nullable(), size: z.number(), sort_order: z.number(), is_public: z.boolean(),
   signature: z.string().nullable(), signature_filename: z.string().nullable(),
+  target_platforms: z.array(z.string()).nullish(),
 });
 export const updateVersionSchema = z.object({
   version: z.string(), channel: z.string(), status: z.string(), notes: z.string().nullable(),
-  release_tag: z.string().nullable(), release_id: z.string().nullable(), published_at: z.string(),
+  release_tag: z.string().nullable(), release_id: z.string().nullable(), published_at: z.string().nullable(),
   minimum_version: z.string().nullable(), force_update: z.boolean(), artifacts: z.array(updateArtifactSchema),
 });
 export const updateVersionListSchema = z.object({ versions: z.array(updateVersionSchema) });
@@ -69,9 +69,10 @@ export const updateDownloadSchema = z.object({
   id: z.number(), kind: z.string(), platform: z.string(), architecture: z.string(), variant: z.string(),
   label: z.string(), display_name: z.string(), sort_order: z.number(), filename: z.string(), url: z.string(),
   size: z.number(), sha256: z.string().nullable(), signature: z.string().nullable(), signature_filename: z.string().nullable(),
+  target_platforms: z.array(z.string()).nullish(),
 });
 export const updateDownloadsSchema = z.object({
-  version: z.string(), channel: z.string(), status: z.string(), published_at: z.string(),
+  version: z.string(), channel: z.string(), status: z.string(), published_at: z.string().nullable(),
   force_update: z.boolean(), downloads: z.array(updateDownloadSchema),
 });
 export const updateManifestSchema = z.object({
@@ -80,8 +81,8 @@ export const updateManifestSchema = z.object({
 });
 export const updateAuditLogsSchema = z.object({
   logs: z.array(z.object({
-    operator: z.string(), action: z.string(), channel: z.string(), version: z.string(),
-    reason: z.string().nullable(), request_id: z.string(), ip_address: z.string(), created_at: z.string(),
+    operator: z.string(), action: z.string(), channel: z.string().nullable(), version: z.string().nullable(),
+    reason: z.string().nullable(), request_id: z.string().nullable(), ip_address: z.string().nullable(), created_at: z.string(),
   })),
 });
 

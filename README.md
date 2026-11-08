@@ -45,15 +45,17 @@ Vercel 项目 Settings → Environment Variables 中应为 Production 配置公�
 
 “更新”模块通过 `app/api/admin/updates/**` 代理 Axolotl Update Server（`https://update.axlmc.org`），并复用 Cloudflare Access 会话做鉴权。代理层使用显式路径白名单（`lib/api/update-server.ts`），未列出的路径与查询参数一律拒绝；版本号强制校验为规范化 SemVer。
 
-更新的公开读接口（`/api/versions`、`/api/downloads/*`、`/latest`、`/api/health`）不携带任何上游令牌，仅管理接口（版本撤销/恢复、发布审计）注入 `UPDATE_SERVER_ADMIN_TOKEN`。撤销与恢复的 `operator` 由服务端从 Cloudflare Access 会话取得，不接受浏览器传入，并在成功后写入本地 `audit_logs`。
+浏览器只访问 AxoAdmin 同源的 `/api/admin/updates/*`；Next.js 在服务端请求 Update Server，所以不需要为 Update Server 开放 CORS，也不会把管理令牌发送给浏览器。公开读取不携带令牌；统计、强制更新、删除/清理、撤销/恢复及发布审计注入 `UPDATE_SERVER_ADMIN_TOKEN`。operator 从登录会话取得，不接受浏览器传入，成功后同时写平台审计。
 
-更新服务的错误响应体经常是空的（版本不存在返回 404、无更新返回 204、凭证无效返回 401，均为空 body），因此代理层会统一合成本面板自己的 JSON 错误信封，前端通过 `useUpdateApi` 区分 204（合法空结果）与真实失败。
+代理保留 Go 服务的具体错误码和请求 ID，区分统计繁忙、查询超时、版本忙、清单缺失和已重新发布的版本。204 是合法无更新结果；写操作不自动向另一个 origin 重试，以免网络超时后重复执行。统计代理超时为 30 秒，普通请求 15 秒。
 
-产物上传端点（`PUT /api/artifacts/<version>/<filename>`）**不接入本面板**：安装包体积在 55–135MB，超过 Vercel 请求体上限，且把上传令牌下发到浏览器会造成泄漏。维护性上传请继续在本地或 CI 完成。
+版本列表和详情支持启用/关闭强制更新、撤销/恢复、删除版本；删除需输入版本号。操作成功后先读回最新数据，再关闭确认框；刷新失败时只重试读取。清理未完成的版本在当前浏览器会话保留重试入口，调用独立 `POST /api/admin/versions/:version/cleanup`，不会重复 DELETE 已重新发布的版本。
 
-上游仅保留最新 3 个 Release 与 3 个 Beta 版本的产物，更早版本的 `/dist` 请求会 302 跳转到 GitHub Release，面板里对这类版本会给出提示。
+制品采用元数据发布，安装包由独立分发服务器提供，不再按最近三个版本清理元数据。面板显示 target_platforms，支持通用 macOS 更新器。旧上传接口已退役，不提供手动上传入口。
 
-更新服务的 `/api/admin/stats` **未接入本面板**：该接口在上游会把区间内每一条 `usage_event`（当前约 52 万行）实例化后再在 Python 里遍历聚合，实测 24 小时区间需 5–9 秒、7 天与 30 天区间约 40 秒，无法支撑可用的管理界面。它的下载维度目前也没有数据来源——生产环境 `/dist` 由 Caddy 直接提供静态文件，请求不经过 Flask，`usage_event` 中 download 事件恒为 0，且 Caddyfile 未配置访问日志。若后续要恢复用量统计，应先在上游把聚合下推为 SQL `GROUP BY`（`app/routes/api.py` 的 `usage_stats`）、考虑切换到 WAL 模式，并启用 Caddy 访问日志。
+“更新 → 数据分析”接入统计 API v2 的 dashboard、meta、status、breakdown 和 requests。提供 1 小时～14 天范围、白名单精确筛选、指标趋势、状态与延迟百分位、客户端/来源分布、明细分页和 JSON 导出。仅统计 `/latest` 和 `/api/*`，不是下载服务器流量；独立 IP 不是用户人数；GeoIP 未配置时展示未知，历史缺失的字节/耗时也不补成零。刷新失败保留旧查询快照并标明状态。
+
+Update Server 需运行统计 API v2 并应用 `00003_statistics`。14 天游标分页和安全清理需包含后续修复 `3b5f6c5`，无需增加数据库迁移。其他赞助、遥测和身份认证服务不受本次更新影响。
 
 ## 模块
 

@@ -120,7 +120,7 @@ export default function Channels() {
           {valid && !manifest.loading && !manifest.error && manifest.status === 204 && (
             <AdminEmpty label={`${platformNames[platform] ?? platform} 的 ${channel} 渠道已是最新版本。`} hint="更新服务返回 204，表示当前版本没有可用的更新。" />
           )}
-          {valid && !manifest.loading && manifest.data && (
+          {valid && !manifest.loading && !manifest.error && manifest.committedPath === `/api/admin/updates/latest${query}` && manifest.data && (
             <div className="grid min-w-0 gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <ToneBadge tone="green">可更新至 {manifest.data.version}</ToneBadge>

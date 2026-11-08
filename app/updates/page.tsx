@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { MoreHorizontal, Package, RefreshCw, RotateCcw, ShieldCheck, ShieldOff, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { MoreHorizontal, Package, RefreshCw, RotateCcw, ShieldCheck, ShieldOff, Trash2, Wifi, WifiOff, Zap } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { ToneBadge, type Tone } from "@/components/dashboard/status-badge";
@@ -13,7 +13,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RevokeDialog, RestoreDialog } from "@/components/updates/release-dialogs";
+import { DeleteVersionDialog, ForceUpdateDialog, RevokeDialog, RestoreDialog } from "@/components/updates/release-dialogs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { pendingCleanup } from "@/lib/updates/actions";
 import { useUpdateApi } from "@/lib/api/use-admin-data";
 import { updateHealthSchema, updateVersionListSchema } from "@/lib/api/schemas";
 import { formatDate } from "@/lib/updates/format";
@@ -37,11 +39,16 @@ export default function Updates() {
   const [status, setStatus] = useState("all");
   const [revoking, setRevoking] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [forcing, setForcing] = useState<{ version: string; enabled: boolean } | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [cleanup, setCleanup] = useState<string[]>([]);
+  useEffect(() => setCleanup(pendingCleanup()), []);
 
   const health = useUpdateApi("/api/admin/updates/health", updateHealthSchema);
   const versions = useUpdateApi("/api/admin/updates/versions", updateVersionListSchema);
   const list = useMemo(() => versions.data?.versions ?? [], [versions.data]);
   const reload = () => { health.reload(); versions.reload(); };
+  const afterAction = async () => { setCleanup(pendingCleanup()); if (!await versions.reload()) throw new Error("操作已提交，但版本列表刷新失败。请重试刷新，不会重复提交操作。"); };
 
   const newest = (target: string) => list.find((item) => item.channel === target && item.status === "published");
   const release = newest("release");
@@ -60,7 +67,7 @@ export default function Updates() {
 
   return (
     <div className="grid min-w-0 gap-6">
-      <PageHeader title="版本与产物" description="查看已发布的启动器版本、产物清单与投送渠道，并处理需要撤销的版本。">
+      <PageHeader title="版本与产物" description="管理启动器版本、制品元数据、更新策略与发布状态。">
         <Button variant="outline" size="sm" disabled={busy} onClick={reload}>
           <RefreshCw className={busy ? "animate-spin" : undefined} />
           刷新
@@ -81,13 +88,14 @@ export default function Updates() {
       </div>
 
       {versions.error && <AdminError message={versions.error} onRetry={reload} />}
+      {cleanup.length > 0 && <Alert><AlertDescription className="flex flex-wrap items-center gap-2">这些版本已删除，但文件清理尚未完成：{cleanup.map((version) => <Button key={version} variant="outline" size="sm" onClick={() => setDeleting(version)}>重试清理 {version}</Button>)}</AlertDescription></Alert>}
 
       <Card className="min-w-0 overflow-hidden">
         <CardHeader className="border-b pb-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>版本列表</CardTitle>
-              <CardDescription>按 SemVer 倒序排列。上游仅保留最新 3 个 Release 与 3 个 Beta 的产物。</CardDescription>
+              <CardDescription>按 SemVer 倒序排列，制品由独立分发服务器提供，更新服务保留元数据与清单。</CardDescription>
             </div>
             <span className="text-xs text-muted-foreground">{rows.length} / {list.length} 个版本</span>
           </div>
@@ -143,7 +151,7 @@ export default function Updates() {
                 <TableRow key={item.version}>
                   <TableCell>
                     <Link href={`/updates/${item.version}`} className="font-medium hover:underline">{item.version}</Link>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.release_tag ?? "无发布标签"}{item.force_update ? " · 强制更新" : ""}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{item.release_tag ?? "无发布标签"}</span>{item.force_update && <ToneBadge tone="amber"><Zap className="size-3" />强制更新</ToneBadge>}</div>
                   </TableCell>
                   <TableCell><div className="flex flex-wrap gap-1.5"><ChannelBadge channel={item.channel} /><StatusBadge status={item.status} /></div></TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -158,9 +166,10 @@ export default function Updates() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild><Link href={`/updates/${item.version}`}>查看详情</Link></DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        {item.status === "revoked"
-                          ? <DropdownMenuItem onSelect={() => setRestoring(item.version)}><RotateCcw />恢复版本</DropdownMenuItem>
-                          : <DropdownMenuItem variant="destructive" onSelect={() => setRevoking(item.version)}><ShieldOff />撤销版本</DropdownMenuItem>}
+                        {item.status === "revoked" && <DropdownMenuItem onSelect={() => setRestoring(item.version)}><RotateCcw />恢复版本</DropdownMenuItem>}
+                        {(item.status === "published" || item.status === "revoked") && <DropdownMenuItem onSelect={() => setForcing({ version: item.version, enabled: !item.force_update })}><Zap />{item.force_update ? "关闭强制更新" : "启用强制更新"}</DropdownMenuItem>}
+                        {item.status === "published" && <DropdownMenuItem variant="destructive" onSelect={() => setRevoking(item.version)}><ShieldOff />撤销版本</DropdownMenuItem>}
+                        <DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => setDeleting(item.version)}><Trash2 />删除版本</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -171,8 +180,10 @@ export default function Updates() {
         )}
       </Card>
 
-      {revoking && <RevokeDialog version={revoking} open={Boolean(revoking)} onOpenChange={(open) => !open && setRevoking(null)} onDone={reload} />}
-      {restoring && <RestoreDialog version={restoring} open={Boolean(restoring)} onOpenChange={(open) => !open && setRestoring(null)} onDone={reload} />}
+      {revoking && <RevokeDialog version={revoking} open={Boolean(revoking)} onOpenChange={(open) => !open && setRevoking(null)} onDone={afterAction} />}
+      {restoring && <RestoreDialog version={restoring} open={Boolean(restoring)} onOpenChange={(open) => !open && setRestoring(null)} onDone={afterAction} />}
+      {forcing && <ForceUpdateDialog {...forcing} open onOpenChange={(open) => !open && setForcing(null)} onDone={afterAction} />}
+      {deleting && <DeleteVersionDialog version={deleting} open onOpenChange={(open) => { if (!open) { setDeleting(null); setCleanup(pendingCleanup()); } }} onDone={afterAction} />}
     </div>
   );
 }

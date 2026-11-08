@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  ChartNoAxesCombined,
   Bell,
   Coins,
   Command,
@@ -55,7 +56,7 @@ import type { AdminSession } from "@/lib/auth/access";
 const groups = [
   { label: "工作台", items: [{ label: "总览", href: "/", icon: LayoutDashboard }] },
   { label: "遥测中心", items: [{ label: "数据总览", href: "/telemetry", icon: Activity }, { label: "系统状态", href: "/telemetry/system", icon: Server }] },
-  { label: "更新", items: [{ label: "版本与产物", href: "/updates", icon: Package }, { label: "渠道分发", href: "/updates/channels", icon: GitBranch }, { label: "发布审计", href: "/updates/audit", icon: History }] },
+  { label: "更新", items: [{ label: "版本与产物", href: "/updates", icon: Package }, { label: "渠道分发", href: "/updates/channels", icon: GitBranch }, { label: "数据分析", href: "/updates/analytics", icon: ChartNoAxesCombined }, { label: "发布审计", href: "/updates/audit", icon: History }] },
   { label: "赞助与权益", items: [{ label: "用户", href: "/sponsors/users", icon: Users }, { label: "赞助订单", href: "/sponsors/orders", icon: ReceiptText }, { label: "CDK 管理", href: "/sponsors/cdks", icon: Coins }] },
   { label: "公告", items: [{ label: "公告管理", href: "/announcements", icon: Bell }] },
   { label: "运营", items: [{ label: "API Key", href: "/operations/api-keys", icon: KeyRound }, { label: "API 用量", href: "/operations/usage", icon: Activity }] },
@@ -89,7 +90,7 @@ function getBreadcrumbs(pathname: string) {
   items.push({ label: match.item.label, href: match.item.href });
 
   // Handle sub-pages
-  if (pathname.startsWith("/updates/") && pathname !== "/updates/channels" && pathname !== "/updates/audit") {
+  if (pathname.startsWith("/updates/") && match.item.href === "/updates") {
     const version = decodeURIComponent(pathname.replace("/updates/", ""));
     items.push({ label: version, href: "" });
   } else if (pathname.startsWith("/sponsors/users/") && pathname !== "/sponsors/users") {

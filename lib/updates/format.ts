@@ -5,11 +5,13 @@ export function utcTimestamp(value: string) {
   return new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(value) ? value : value + "Z");
 }
 
-export function formatDateTime(value: string) {
+export function formatDateTime(value: string | null) {
+  if (!value) return "—";
   return utcTimestamp(value).toLocaleString("zh-CN", { hour12: false });
 }
 
-export function formatDate(value: string) {
+export function formatDate(value: string | null) {
+  if (!value) return "—";
   return utcTimestamp(value).toLocaleDateString("zh-CN");
 }
 

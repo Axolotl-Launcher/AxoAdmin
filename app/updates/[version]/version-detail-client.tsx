@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, ExternalLink, RefreshCw, RotateCcw, ShieldOff } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, RotateCcw, ShieldOff, Trash2, Zap } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ToneBadge, type Tone } from "@/components/dashboard/status-badge";
 import { AdminEmpty, AdminError, TableSkeleton } from "@/components/dashboard/admin-state";
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RevokeDialog, RestoreDialog } from "@/components/updates/release-dialogs";
+import { DeleteVersionDialog, ForceUpdateDialog, RevokeDialog, RestoreDialog } from "@/components/updates/release-dialogs";
 import { useUpdateApi } from "@/lib/api/use-admin-data";
 import { updateDownloadsSchema, updateVersionSchema } from "@/lib/api/schemas";
 import { formatBytes, formatDateTime, shortDigest } from "@/lib/updates/format";
@@ -33,10 +34,14 @@ export default function VersionDetailClient({ version }: { version: string }) {
   const [kind, setKind] = useState("all");
   const [revoking, setRevoking] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [forcing, setForcing] = useState<boolean | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
 
   const detail = useUpdateApi(`/api/admin/updates/versions/${encodeURIComponent(version)}`, updateVersionSchema);
-  const downloads = useUpdateApi(`/api/admin/updates/downloads/${encodeURIComponent(version)}?include_updater=true`, updateDownloadsSchema);
+  const downloads = useUpdateApi(`/api/admin/updates/downloads/${encodeURIComponent(version)}?include_updater=true&include_revoked=true`, updateDownloadsSchema);
   const reload = () => { detail.reload(); downloads.reload(); };
+  const afterAction = async () => { const [ok] = await Promise.all([detail.reload(), downloads.reload()]); if (!ok) throw new Error("操作已提交，但版本详情刷新失败。请重试刷新，不会重复提交操作。"); };
 
   const data = detail.data;
   const artifacts = useMemo(() => data?.artifacts.filter((item) => kind === "all" || item.kind === kind) ?? [], [data, kind]);
@@ -51,7 +56,7 @@ export default function VersionDetailClient({ version }: { version: string }) {
   const busy = detail.loading || downloads.loading;
   return (
     <div className="grid min-w-0 gap-6">
-      <PageHeader title={data?.version ?? version} description="查看该版本的元数据、Release notes 与全部产物，并可以撤销或恢复它。">
+      <PageHeader title={data?.version ?? version} description="查看制品与发布记录，管理该版本的更新策略。">
         <Button asChild variant="outline" size="sm">
           <Link href="/updates">
             <ArrowLeft data-icon="inline-start" />
@@ -62,9 +67,10 @@ export default function VersionDetailClient({ version }: { version: string }) {
           <RefreshCw className={busy ? "animate-spin" : undefined} />
           刷新
         </Button>
-        {data && (data.status === "revoked"
-          ? <Button size="sm" onClick={() => setRestoring(true)}><RotateCcw data-icon="inline-start" />恢复版本</Button>
-          : <Button variant="destructive" size="sm" onClick={() => setRevoking(true)}><ShieldOff data-icon="inline-start" />撤销版本</Button>)}
+        {data && (data.status === "published" || data.status === "revoked") && <Button size="sm" variant="outline" onClick={() => setForcing(!data.force_update)}><Zap />{data.force_update ? "关闭强制更新" : "启用强制更新"}</Button>}
+        {data?.status === "revoked" && <Button size="sm" onClick={() => setRestoring(true)}><RotateCcw />恢复版本</Button>}
+        {data?.status === "published" && <Button variant="destructive" size="sm" onClick={() => setRevoking(true)}><ShieldOff />撤销版本</Button>}
+        {data && <Button variant="destructive" size="sm" onClick={() => setDeleting(true)}><Trash2 />删除版本</Button>}
       </PageHeader>
 
       {detail.loading && !data && (
@@ -88,7 +94,7 @@ export default function VersionDetailClient({ version }: { version: string }) {
               </Field>
               <Field label="状态"><ToneBadge tone={statusTones[data.status] ?? "neutral"}>{statusNames[data.status] ?? data.status}</ToneBadge></Field>
               <Field label="发布时间">{formatDateTime(data.published_at)}</Field>
-              <Field label="强制更新">{data.force_update ? "是" : "否"}</Field>
+              <Field label="更新策略"><ToneBadge tone={data.force_update ? "amber" : "neutral"}>{data.force_update ? "强制更新已启用" : "正常更新"}</ToneBadge></Field>
               <Field label="最低版本要求">{data.minimum_version ?? "无"}</Field>
               <Field label="发布 ID">{data.release_id ?? "无"}</Field>
               <Field label="产物总数">{data.artifacts.length} 个（{data.artifacts.filter((item) => item.is_public).length} 个公开）</Field>
@@ -143,9 +149,11 @@ export default function VersionDetailClient({ version }: { version: string }) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {item.platform || "—"}{item.architecture ? " / " + item.architecture : ""}{item.variant ? " · " + item.variant : ""}
+                        {item.target_platforms && item.target_platforms.length > 1 && <p className="mt-1 whitespace-normal">覆盖 {item.target_platforms.join("、")}</p>}
                       </TableCell>
                       <TableCell className="max-w-72 break-all">
                         <p className="font-medium">{item.display_name}</p>
+                        {item.filename !== item.display_name && <p className="mt-1 text-xs text-muted-foreground">{item.filename}</p>}
                         <p className="mt-1 text-xs text-muted-foreground">{item.is_public ? "公开" : "非公开"}{item.signature ? " · 含 Tauri 签名" : ""}</p>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatBytes(item.size)}</TableCell>
@@ -166,7 +174,7 @@ export default function VersionDetailClient({ version }: { version: string }) {
               {downloads.loading && !downloads.data ? (
                 <p role="status" className="py-6 text-center text-sm text-muted-foreground">正在加载下载目录…</p>
               ) : downloads.status === 404 ? (
-                <AdminEmpty label="该版本没有可下载的包。" hint="版本可能尚未发布，或产物已随保留策略移除；更早版本请到 GitHub Release 下载。" />
+                <AdminEmpty label="该版本没有可用下载目录。" hint="请确认版本已发布，或以管理员身份查看撤销版本。" />
               ) : downloads.error ? (
                 <AdminError message={downloads.error} onRetry={reload} />
               ) : grouped.length === 0 ? (
@@ -187,14 +195,16 @@ export default function VersionDetailClient({ version }: { version: string }) {
                   </div>
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground">上游只保留最新 3 个 Release 与 3 个 Beta 的产物，更早版本的下载链接会自动跳转到 GitHub Release。</p>
+              <p className="text-xs text-muted-foreground">链接由更新服务生成并转发到分发服务器。元数据不会因版本较旧而自动移除。</p>
             </CardContent>
           </Card>
         </>
       )}
 
-      <RevokeDialog version={version} open={revoking} onOpenChange={setRevoking} onDone={reload} />
-      <RestoreDialog version={version} open={restoring} onOpenChange={setRestoring} onDone={reload} />
+      <RevokeDialog version={version} open={revoking} onOpenChange={setRevoking} onDone={afterAction} />
+      <RestoreDialog version={version} open={restoring} onOpenChange={setRestoring} onDone={afterAction} />
+      <ForceUpdateDialog version={version} enabled={forcing ?? false} open={forcing !== null} onOpenChange={(open) => !open && setForcing(null)} onDone={afterAction} />
+      <DeleteVersionDialog version={version} open={deleting} onOpenChange={setDeleting} onDone={() => router.push("/updates")} />
     </div>
   );
 }

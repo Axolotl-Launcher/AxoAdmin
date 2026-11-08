@@ -9,3 +9,6 @@ export async function POST(request: Request, context: { params: Promise<{ path: 
   const { path } = await context.params;
   return updateServerRequest(path.join("/"), request);
 }
+
+export const PATCH = POST;
+export const DELETE = POST;
