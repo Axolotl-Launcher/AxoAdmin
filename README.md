@@ -57,6 +57,8 @@ Vercel 项目 Settings → Environment Variables 中应为 Production 配置公�
 
 Update Server 需运行统计 API v2 并应用 `00003_statistics`。14 天游标分页和安全清理需包含后续修复 `3b5f6c5`，无需增加数据库迁移。其他赞助、遥测和身份认证服务不受本次更新影响。
 
+统计维度修正需与新版 Update Server 一同部署，并执行 `db migrate`、`analytics reclassify` 重算历史 UA 字典。应用统一显示“应用”，版本保留于客户端版本；来源区分应用直接访问/其他直接访问，响应格式区分无响应体，错误区分无错误与 HTTP 错误，下载目录参数在其他接口上显示不适用。API 使用 `@application`、`@direct`、`@empty`、`@none`、`@http_error`、`@not_applicable`、`@not_provided` 作为对应维度的计算值，点击分布行将原值传给后端精确筛选。没有采集的旧数据仍显示未知，不能从空值反推系统或默认布尔值。
+
 ## 模块
 
 - 工作台
