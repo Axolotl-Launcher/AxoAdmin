@@ -5,10 +5,9 @@
 .metricGrid > :nth-child(n + 3) { border-block-start: 1px solid var(--border); }
 .metric:active { transform: translateY(1px); }
 .metric[data-selected="true"] { box-shadow: inset 0 -2px 0 var(--chart-1); background: color-mix(in srgb, var(--chart-1) 5%, var(--card)); }
-.refreshing { opacity: .65; transition: opacity 140ms ease; }
 @media (min-width: 80rem) {
   .metricGrid > :nth-child(n + 2) { border-inline-start: 1px solid var(--border); }
   .metricGrid > :nth-child(n + 3) { border-block-start: 0; }
 }
 @keyframes analytics-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .page, .content { animation: none; } .metric, .refreshing { transition: none; } .metric:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .page, .content { animation: none; } .metric { transition: none; } .metric:active { transform: none; } }
