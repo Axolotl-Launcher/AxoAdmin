@@ -34,7 +34,7 @@ export default function UpdateAnalytics() {
   const [explore, setExplore] = useState("asn");
   const meta = useUpdateApi("/api/admin/updates/stats/meta", statsMetaSchema);
   const ready = Boolean(meta.data || meta.error);
-  const params = analyticsQuery(query); params.set("dimensions", dimensions[tab].join(",")); params.set("limit", "8");
+  const params = analyticsQuery(query); if (!query.filters.length) params.set("scheduled", "true"); params.set("dimensions", dimensions[tab].join(",")); params.set("limit", "8");
   const path = `/api/admin/updates/stats?${params}`;
   const dashboard = useUpdateApi(path, statsDashboardSchema, ready && tab !== "requests");
   const status = useUpdateApi("/api/admin/updates/stats/status", statsStatusSchema, ready);
@@ -42,11 +42,11 @@ export default function UpdateAnalytics() {
   const overview = data?.overview;
   const committed = dashboard.data?.window;
   const loading = meta.loading || dashboard.loading;
-  const extraParams = analyticsQuery(query); extraParams.set("dimension", explore); extraParams.set("limit", "8");
+  const extraParams = analyticsQuery(query); if (!query.filters.length) extraParams.set("scheduled", "true"); extraParams.set("dimension", explore); extraParams.set("limit", "8");
   const extraPath = `/api/admin/updates/stats/breakdown?${extraParams}`;
   const extra = useUpdateApi(extraPath, statsBreakdownResponseSchema, ready && Boolean(data) && !dashboard.loading && !data?.breakdowns[explore] && tab !== "requests");
 
-  function addFilter(key: string, value: string) { if (!value.trim()) return; setQuery((current) => ({ ...current, filters: [...current.filters.filter((item) => item.key !== key), { key, value: value.trim() }] })); setFilterValue(""); }
+  function addFilter(key: string, value: string) { if (!value.trim()) return; setQuery((current) => ({ ...current, ...(dashboard.data?.cache?.scheduled && committed ? { start: committed.start, end: committed.end } : {}), filters: [...current.filters.filter((item) => item.key !== key), { key, value: value.trim() }] })); setFilterValue(""); }
   function refresh() { setQuery((current) => ({ ...timeRange(Number(range)), filters: current.filters })); void status.reload(); }
   function exportSummary() { if (!dashboard.data) return; const blob = new Blob([JSON.stringify(dashboard.data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `update-analytics-${query.end.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); }
   const metrics = [{ key: "requests" as const, title: "请求总数", value: overview ? formatCount(overview.requests) : "—", hint: overview ? `${overview.requests_per_second.toFixed(2)} 次 / 秒` : "源站收到的请求" }, { key: "unique_ips" as const, title: "独立 IP", value: overview ? formatCount(overview.unique_ips) : "—", hint: "IP 去重，非访客数" }, { key: "response_bytes" as const, title: "响应体流量", value: overview && overview.response_byte_samples ? formatBytes(overview.response_bytes) : "—", hint: "应用写出，不含代理压缩" }, { key: "error_rate" as const, title: "错误率", value: overview ? formatPercent(overview.error_rate) : "—", hint: overview ? `${formatCount(overview.status_4xx + overview.status_5xx)} 次 4xx / 5xx 响应` : "有状态码的请求样本" }];
@@ -57,7 +57,7 @@ export default function UpdateAnalytics() {
       <Button variant="outline" size="sm" disabled={loading} onClick={refresh}><RefreshCw />{loading && data ? "更新中…" : "刷新"}</Button>
     </PageHeader>
 
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><span className={`size-1.5 rounded-full ${status.data?.data.enabled ? "bg-emerald-500" : "bg-muted-foreground"}`} />{status.data ? status.data.data.enabled ? "正在采集" : "采集已暂停" : "连接更新服务"}</span><span>保留 {meta.data?.retention_days ?? 14} 天</span>{dashboard.data && <span>更新于 {formatDateTime(dashboard.data.generated_at)}</span>}<span className="inline-flex items-center gap-1"><Globe2 className="size-3.5" />源站请求</span></div>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1.5"><span className={`size-1.5 rounded-full ${status.data?.data.enabled ? "bg-emerald-500" : "bg-muted-foreground"}`} />{status.data ? status.data.data.enabled ? "正在采集" : "采集已暂停" : "连接更新服务"}</span><span>保留 {meta.data?.retention_days ?? 14} 天</span>{dashboard.data && <span>{dashboard.data.cache?.scheduled ? "定时统计更新于" : "更新于"} {formatDateTime(dashboard.data.generated_at)}{dashboard.data.cache?.scheduled ? dashboard.data.cache.stale ? " · 更新延迟" : " · 每小时维护" : ""}</span>}<span className="inline-flex items-center gap-1"><Globe2 className="size-3.5" />源站请求</span></div>
 
     <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
       <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); addFilter(filterKey, filterValue); }}><Filter className="mr-1 size-4 text-muted-foreground" /><Label htmlFor="analytics-filter-value" className="sr-only">筛选值</Label><Select value={filterKey} onValueChange={setFilterKey}><SelectTrigger className="w-40" aria-label="筛选维度"><SelectValue /></SelectTrigger><SelectContent>{(meta.data?.dimensions ?? Object.keys(dimensionLabels)).map((key) => <SelectItem key={key} value={key}>{dimensionLabels[key] ?? key}</SelectItem>)}</SelectContent></Select><Input id="analytics-filter-value" className="min-w-36 flex-1 sm:max-w-72" placeholder={filterKey === "route" ? "例如 /latest" : "输入精确匹配的值"} value={filterValue} onChange={(event) => setFilterValue(event.target.value)} /><Button variant="outline" size="sm" disabled={!filterValue.trim()}>添加筛选</Button>{query.filters.length > 0 && <Button variant="ghost" size="sm" onClick={() => setQuery((current) => ({ ...current, filters: [] }))} type="button">清除全部</Button>}</form>

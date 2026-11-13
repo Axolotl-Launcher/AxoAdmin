@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const nullableNumber = z.number().nullable();
+const scheduledCacheSchema = z.object({ scheduled: z.boolean(), refresh_seconds: z.number(), stale: z.boolean() }).optional();
 export const statsMetricsSchema = z.object({
   requests: z.number(), unique_ips: z.number(), unique_user_agents: z.number(), requests_per_second: z.number(),
   status_samples: z.number(), status_1xx: z.number(), status_2xx: z.number(), status_3xx: z.number(), status_4xx: z.number(), status_5xx: z.number(),
@@ -12,7 +13,7 @@ export const statsMetricsSchema = z.object({
 export const statsOverviewSchema = statsMetricsSchema.extend({ latency: z.object({ p50_ms: nullableNumber, p90_ms: nullableNumber, p95_ms: nullableNumber, p99_ms: nullableNumber }) });
 export const statsBreakdownSchema = z.object({ dimension: z.string(), items: z.array(statsMetricsSchema.extend({ value: z.string().nullable() })), total_requests: z.number(), other_requests: z.number(), limit: z.number() });
 export const statsWindowSchema = z.object({ start: z.string(), end: z.string(), interval: z.string(), interval_seconds: z.number(), filters: z.record(z.string()), retention_clamped: z.boolean() });
-export const statsDashboardSchema = z.object({ schema_version: z.literal(2), scope: z.literal("origin"), generated_at: z.string(), window: statsWindowSchema, data: z.object({ overview: statsOverviewSchema, timeseries: z.array(statsMetricsSchema.extend({ time: z.string() })), breakdowns: z.record(statsBreakdownSchema) }) });
+export const statsDashboardSchema = z.object({ schema_version: z.literal(2), scope: z.literal("origin"), generated_at: z.string(), cache: scheduledCacheSchema, window: statsWindowSchema, data: z.object({ overview: statsOverviewSchema, timeseries: z.array(statsMetricsSchema.extend({ time: z.string() })), breakdowns: z.record(statsBreakdownSchema) }) });
 export const statsBreakdownResponseSchema = z.object({ schema_version: z.literal(2), window: statsWindowSchema, data: statsBreakdownSchema });
 export const statsMetaSchema = z.object({ schema_version: z.literal(2), retention_days: z.number(), dimensions: z.array(z.string()), intervals: z.array(z.string()), includes_stats_requests: z.boolean(), capabilities: z.record(z.boolean()) });
 export const statsStatusSchema = z.object({ schema_version: z.literal(2), data: z.object({ enabled: z.boolean(), requests: z.number(), requests_with_http_metrics: z.number(), oldest_request: z.string().nullable(), newest_request: z.string().nullable(), collector_attached: z.boolean(), collector: z.object({ written: z.number(), failed_batches: z.number(), dropped: z.number(), queue_length: z.number() }).optional() }) });

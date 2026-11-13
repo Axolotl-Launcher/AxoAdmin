@@ -34,7 +34,7 @@ const routes: Route[] = [
 ];
 
 const statsFilters = ["route", "method", "host", "scheme", "http_version", "tls_version", "status_code", "status_class", "country", "continent", "region", "city", "asn", "asn_org", "client_ip", "ip_version", "user_agent", "browser", "browser_version", "os", "os_version", "device_type", "is_bot", "referer_host", "content_type", "app_cache", "error_code", "channel", "client_version", "platform", "target_version", "include_updater", "include_revoked"];
-const statsParams = ["start", "end", "interval", "limit", ...statsFilters];
+const statsParams = ["start", "end", "interval", "limit", "scheduled", ...statsFilters];
 routes.push({ pattern: ["stats"], method: "GET", auth: "admin", params: [...statsParams, "dimensions"], upstream: () => "/api/admin/stats" });
 for (const kind of ["overview", "timeseries", "breakdown", "requests", "meta", "status"]) {
   routes.push({ pattern: ["stats", kind], method: "GET", auth: "admin", params: kind === "meta" || kind === "status" ? [] : [...statsParams, ...(kind === "breakdown" ? ["dimension"] : kind === "requests" ? ["cursor"] : [])], upstream: () => `/api/admin/stats/${kind}` });

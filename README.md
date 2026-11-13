@@ -55,6 +55,8 @@ Vercel 项目 Settings → Environment Variables 中应为 Production 配置公�
 
 “更新 → 数据分析”接入统计 API v2 的 dashboard、meta、status、breakdown 和 requests。提供 1 小时～14 天范围、白名单精确筛选、指标趋势、状态与延迟百分位、客户端/来源分布、明细分页和 JSON 导出。仅统计 `/latest` 和 `/api/*`，不是下载服务器流量；独立 IP 不是用户人数；GeoIP 未配置时展示未知，历史缺失的字节/耗时也不补成零。刷新失败保留旧查询快照并标明状态。
 
+新版无筛选预设范围使用 `scheduled=true` 读取 Update Server 每小时维护的统计快照，标明生成时间和更新延迟；响应 window 为实际统计时间范围。首次准备中返回 202 时，每 5 秒自动重新读取，最多等待十分钟，切换查询会取消等待；保留旧快照，不把准备中当成空数据。点击分布下钻沿用已显示快照的范围，精确筛选和请求明细仍实时查询。需要服务端迁移 `00006_stats_snapshots` 并升级后端。
+
 Update Server 需运行统计 API v2 并应用 `00003_statistics`。14 天游标分页和安全清理需包含后续修复 `3b5f6c5`，无需增加数据库迁移。其他赞助、遥测和身份认证服务不受本次更新影响。
 
 统计维度修正需与新版 Update Server 一同部署，并执行 `db migrate`、`analytics reclassify` 重算历史 UA 字典。应用统一显示“应用”，版本保留于客户端版本；来源区分应用直接访问/其他直接访问，响应格式区分无响应体，错误区分无错误与 HTTP 错误，下载目录参数在其他接口上显示不适用。API 使用 `@application`、`@direct`、`@empty`、`@none`、`@http_error`、`@not_applicable`、`@not_provided` 作为对应维度的计算值，点击分布行将原值传给后端精确筛选。没有采集的旧数据仍显示未知，不能从空值反推系统或默认布尔值。

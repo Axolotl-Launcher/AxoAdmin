@@ -64,7 +64,18 @@ export function useUpdateApi<T>(path: string, schema: z.ZodType<T>, enabled = tr
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(path, { cache: "no-store", signal: controller.signal });
+      let response = await fetch(path, { cache: "no-store", signal: controller.signal });
+      const waitingSince = Date.now();
+      while (response.status === 202 && path.startsWith("/api/admin/updates/stats")) {
+        if (Date.now() - waitingSince > 10 * 60 * 1000) throw new Error("定时统计仍在准备中，请稍后刷新。");
+        await new Promise<void>((resolve, reject) => {
+          const aborted = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+          const timer = setTimeout(() => { controller.signal.removeEventListener("abort", aborted); resolve(); }, 5000);
+          if (controller.signal.aborted) aborted();
+          else controller.signal.addEventListener("abort", aborted, { once: true });
+        });
+        response = await fetch(path, { cache: "no-store", signal: controller.signal });
+      }
       if (!response.ok && response.status !== 204) throw new Error(await explain(response));
       const data = response.status === 204 ? null : schema.parse(await response.json());
       if (request !== sequence.current || controller.signal.aborted) return false;
